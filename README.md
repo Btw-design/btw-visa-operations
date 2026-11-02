@@ -73,3 +73,8 @@ The owner explicitly enabled public access for team use without login. Anyone wi
 The owner-configured fallback is HOTEL BOSS, CONTACT@HOTELBOSS.SG, 500 JALAN SULTAN, SINGAPORE 199020. It fills hotel name, building, block/house number, street and postal code, plus local hotel name/email/relationship when those fields are blank. No phone number, floor, unit or reservation details are invented.
 
 The fallback is labelled as default accommodation, not an uploaded booking. It applies to tourism/business hotel stays and to family/friend cases only when Hotel is explicitly selected. Residential host stays are preserved. Selecting a hotel file clears the tracked automatic fallback values before reading it, so failed/missing extraction does not silently reuse Hotel Boss. Manual values are not repeatedly overwritten. Starting a new applicant restores the fallback where applicable.
+
+
+## Separate company login edition
+
+A work-email/password server is now available for external hosting. See [COMPANY-LOGIN.md](COMPANY-LOGIN.md) for first-admin setup, staff management, security controls and hosting requirements. Use `Start-Company-Login.cmd` for this edition. The original static launcher is still a computer-local edition without account enforcement. The existing ChatGPT-hosted Site has separate platform sign-in; this addition does not replace that gate or deploy a new external website.
