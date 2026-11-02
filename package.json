@@ -4,11 +4,12 @@
   "description": "Private passport-to-Form-14A draft assistant",
   "main": "index.js",
   "scripts": {
-    "check": "node --check dist/app.js && node --check dist/parser.js && node --check dist/hotel-parser.js && node --check dist/schema.js && node --check dist/pdf.js && node --check dist/invitation-parser.js && node --check dist/hotel-defaults.js",
+    "check": "node --check dist/app.js && node --check dist/parser.js && node --check dist/hotel-parser.js && node --check dist/schema.js && node --check dist/pdf.js && node --check dist/invitation-parser.js && node --check dist/hotel-defaults.js && node --check dist/passport-ocr.js",
     "test": "node --test tests/workflow.test.mjs",
     "start": "node server/server.mjs",
     "setup:admin": "node server/setup-admin.mjs",
-    "test:auth": "node --test tests/auth.test.mjs"
+    "test:auth": "node --test tests/auth.test.mjs",
+    "test:passport": "node --test tests/passport.test.mjs"
   },
   "keywords": [],
   "author": "",

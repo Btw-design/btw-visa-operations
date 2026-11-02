@@ -78,3 +78,14 @@ The fallback is labelled as default accommodation, not an uploaded booking. It a
 ## Separate company login edition
 
 A work-email/password server is now available for external hosting. See [COMPANY-LOGIN.md](COMPANY-LOGIN.md) for first-admin setup, staff management, security controls and hosting requirements. Use `Start-Company-Login.cmd` for this edition. The original static launcher is still a computer-local edition without account enforcement. The existing ChatGPT-hosted Site has separate platform sign-in; this addition does not replace that gate or deploy a new external website.
+
+
+## Passport OCR reliability update (2026-11-02)
+
+Passport extraction now reads English visual labels without requiring an exact Indian MRZ. Dates follow their labels rather than document text order. Invalid calendar dates and contradictory issue/expiry dates are left blank for review. Complete TD3 machine-readable lines can supply checked passport numbers, birth dates and expiry dates; numerical OCR corrections must pass the field check digit. Names are never inferred from an incomplete MRZ alone.
+
+Passport images retain up to 3200 pixels on the longest edge, with bounded upscaling for small images. Recognition uses automatic page segmentation, then enhanced contrast and a machine-readable-line pass only when key fields are missing. PDF pages with a text layer but incomplete passport details also receive an OCR attempt. Missing critical fields are listed explicitly. Different current passport numbers across uploaded pages block extraction. Hotel and invitation reading remain separate. Applicant processing stays in the browser.
+
+Run `npm run test:passport`, `npm test`, and `npm run test:auth`. Regression fixtures use synthetic text only. A synthetic image was also processed through the actual bundled English Tesseract language data and all six critical visual fields matched. This does not establish accuracy on unseen customer scans, nor ten simultaneous-user capacity. Cropped, blurry, glare-obscured, sideways or unreadable source images may still need a clearer upload or manual completion. No external OCR service or paid API was added.
+
+For the AWS Docker edition, pulling GitHub changes on a Windows computer does not deploy them to the running server. Transfer updated source, rebuild the image, and recreate the running app container with its existing origin, network and persistent authentication volume. Back up authentication data before deployment. Do not rerun administrator bootstrap or replace the existing data volume during this update.
