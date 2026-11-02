@@ -94,3 +94,8 @@ For the AWS Docker edition, pulling GitHub changes on a Windows computer does no
 ## Hostinger hosting
 
 The deployment target is now Hostinger. The interface remains HTML/CSS/JavaScript. See [HOSTINGER.md](HOSTINGER.md) and `deploy/hostinger/compose.yaml` for the complete VPS deployment with HTTPS and persistent staff accounts. The JavaScript login server is retained. AWS infrastructure is not automatically migrated, stopped, or deleted by this change.
+
+
+## Repository-root index
+
+`index.html` is available at the top level, alongside `package.json`. It loads the existing files under `dist/` through its relative base URL. Keep this entry synchronized with `dist/index.html` when changing the HTML. The internal `dist/index.html` remains for the existing Windows launchers and protected Node server. The root entry is a static entry point; company-login hosting must still use the Node server described in HOSTINGER.md.
