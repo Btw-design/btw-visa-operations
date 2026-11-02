@@ -170,7 +170,8 @@ export async function createApp({ databasePath, origin, production = false } = {
   server.on('close',()=>db.close());
   return {server,db};
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Hostinger launches the entry file through a wrapper, so also start when NODE_ENV=production.
+if (process.argv[1] && (resolve(process.argv[1]) === fileURLToPath(import.meta.url) || process.env.NODE_ENV === 'production')) {
   const production = process.env.NODE_ENV === 'production';
   if (production && !process.env.APP_ORIGIN) throw Error('Set APP_ORIGIN to your HTTPS website address.');
   const {server} = await createApp({production});
