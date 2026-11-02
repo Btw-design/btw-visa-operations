@@ -78,3 +78,8 @@ The fallback is labelled as default accommodation, not an uploaded booking. It a
 ## Separate company login edition
 
 A work-email/password server is now available for external hosting. See [COMPANY-LOGIN.md](COMPANY-LOGIN.md) for first-admin setup, staff management, security controls and hosting requirements. Use `Start-Company-Login.cmd` for this edition. The original static launcher is still a computer-local edition without account enforcement. The existing ChatGPT-hosted Site has separate platform sign-in; this addition does not replace that gate or deploy a new external website.
+
+
+## Restored passport OCR fixes
+
+The current passport reader supports English visual labels, validated TD3 machine-readable data, labelled dates, enhanced-contrast retries and clearer missing-field messages. It does not assign dates by their order in OCR text. See [OCR-UPDATE.md](OCR-UPDATE.md) to update the existing static Hostinger site. Run `npm run test:passport` for extraction regression tests.
