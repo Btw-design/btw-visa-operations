@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request as httpRequest } from 'node:http';
-import { createApp } from '../server/server.mjs';
+import { createApp } from '../server/auth-server.mjs';
 import { passwordHash, tokenHash, openDatabase } from '../server/auth.mjs';
 
 function rawFetch(url,options={}) {
