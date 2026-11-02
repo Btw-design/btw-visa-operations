@@ -14,7 +14,7 @@ A private tool to prepare Singapore Form 14A for tourism, family/friend visits a
 
 This version does not save applicant records, documents, or answers to a server or browser storage. Closing or refreshing the page clears the entered information. Document reading uses browser-based OCR or a PDF's embedded text. All document-processing libraries are served with the application; no third-party OCR endpoint is used.
 
-For the private company website, access is enforced by the Node.js company-login server. Hostinger setup is documented in [HOSTINGER.md](HOSTINGER.md). The static Windows launcher is a separate local edition without account enforcement.
+Private access is managed by Sites. Keep the site private. Staff sharing is configured separately; application code does not replace the platform access controls.
 
 ## Scope and limits
 
@@ -38,7 +38,7 @@ For the private company website, access is enforced by the Node.js company-login
 - `dist/form-14a.pdf`: source template.
 - `tests/workflow.test.mjs`: extraction, child conditions, conditional requirements and overflow checks.
 
-Run `npm run check`, `npm test`, `npm run test:passport` and `npm run test:auth` for verification. See [HOSTINGER.md](HOSTINGER.md) for external deployment.
+Run `npm run check` and `npm test` for verification. The tracked hosting manifest identifies the existing private site; reuse its project ID when editing or deploying.
 
 ## Address assistance and capital letters
 
@@ -66,7 +66,7 @@ The initial V39A and invitation-letter formats were tested against the supplied 
 
 ## Current access mode
 
-The target company website uses separate work-email/password accounts. Serve the app through `server/server.mjs`, including its protected PDF and OCR assets. Do not publish `dist/` directly for the staff-login edition. No applicant documents or records are stored by the app.
+The owner explicitly enabled public access for team use without login. Anyone with the URL may use the app. Preserve the current public audience when deploying updates unless the owner requests otherwise. No applicant documents or records are stored by the app.
 
 ## Default hotel when no booking is uploaded
 
@@ -78,24 +78,3 @@ The fallback is labelled as default accommodation, not an uploaded booking. It a
 ## Separate company login edition
 
 A work-email/password server is now available for external hosting. See [COMPANY-LOGIN.md](COMPANY-LOGIN.md) for first-admin setup, staff management, security controls and hosting requirements. Use `Start-Company-Login.cmd` for this edition. The original static launcher is still a computer-local edition without account enforcement. The existing ChatGPT-hosted Site has separate platform sign-in; this addition does not replace that gate or deploy a new external website.
-
-
-## Passport OCR reliability update (2026-11-02)
-
-Passport extraction now reads English visual labels without requiring an exact Indian MRZ. Dates follow their labels rather than document text order. Invalid calendar dates and contradictory issue/expiry dates are left blank for review. Complete TD3 machine-readable lines can supply checked passport numbers, birth dates and expiry dates; numerical OCR corrections must pass the field check digit. Names are never inferred from an incomplete MRZ alone.
-
-Passport images retain up to 3200 pixels on the longest edge, with bounded upscaling for small images. Recognition uses automatic page segmentation, then enhanced contrast and a machine-readable-line pass only when key fields are missing. PDF pages with a text layer but incomplete passport details also receive an OCR attempt. Missing critical fields are listed explicitly. Different current passport numbers across uploaded pages block extraction. Hotel and invitation reading remain separate. Applicant processing stays in the browser.
-
-Run `npm run test:passport`, `npm test`, and `npm run test:auth`. Regression fixtures use synthetic text only. A synthetic image was also processed through the actual bundled English Tesseract language data and all six critical visual fields matched. This does not establish accuracy on unseen customer scans, nor ten simultaneous-user capacity. Cropped, blurry, glare-obscured, sideways or unreadable source images may still need a clearer upload or manual completion. No external OCR service or paid API was added.
-
-For the AWS Docker edition, pulling GitHub changes on a Windows computer does not deploy them to the running server. Transfer updated source, rebuild the image, and recreate the running app container with its existing origin, network and persistent authentication volume. Back up authentication data before deployment. Do not rerun administrator bootstrap or replace the existing data volume during this update.
-
-
-## Hostinger hosting
-
-The deployment target is now Hostinger. The interface remains HTML/CSS/JavaScript. See [HOSTINGER.md](HOSTINGER.md) and `deploy/hostinger/compose.yaml` for the complete VPS deployment with HTTPS and persistent staff accounts. The JavaScript login server is retained. AWS infrastructure is not automatically migrated, stopped, or deleted by this change.
-
-
-## Repository-root index
-
-`index.html` is available at the top level, alongside `package.json`. It loads the existing files under `dist/` through its relative base URL. Keep this entry synchronized with `dist/index.html` when changing the HTML. The internal `dist/index.html` remains for the existing Windows launchers and protected Node server. The root entry is a static entry point; company-login hosting must still use the Node server described in HOSTINGER.md.

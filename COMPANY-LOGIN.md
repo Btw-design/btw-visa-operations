@@ -1,7 +1,5 @@
 # Company login edition
 
-The current hosting target is **Hostinger**. Follow [HOSTINGER.md](HOSTINGER.md) for the VPS/Docker setup, HTTPS, persistence and migration. The browser interface remains HTML/CSS/JavaScript.
-
 This adds a separate work-email/password server for the existing Singapore app. It does not require ChatGPT accounts or call an AI API. It is prepared for external hosting; the existing ChatGPT-hosted Site retains its own platform sign-in and is not converted by these files.
 
 ## Try on Windows
