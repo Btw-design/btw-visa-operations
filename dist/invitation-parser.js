@@ -1,0 +1,22 @@
+export function inverseRelationship(value){const r=String(value||'').toUpperCase().replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim();const map={'MOTHER':'CHILD','FATHER':'CHILD','PARENT':'CHILD','SON':'PARENT','DAUGHTER':'PARENT','CHILD':'PARENT','BROTHER':'SIBLING','SISTER':'SIBLING','SIBLING':'SIBLING','MOTHER IN LAW':'CHILD-IN-LAW','FATHER IN LAW':'CHILD-IN-LAW','SON IN LAW':'PARENT-IN-LAW','DAUGHTER IN LAW':'PARENT-IN-LAW','GRANDMOTHER':'GRANDCHILD','GRANDFATHER':'GRANDCHILD','GRANDSON':'GRANDPARENT','GRANDDAUGHTER':'GRANDPARENT','HUSBAND':'SPOUSE','WIFE':'SPOUSE','SPOUSE':'SPOUSE','FRIEND':'FRIEND','RELATIVE':'RELATIVE','COUSIN':'COUSIN','BUSINESS PARTNER':'BUSINESS PARTNER'};return map[r]||'';}
+export function parseInvitation(source){
+ const text=String(source||'').replace(/[\u200b-\u200f\ufeff]/g,'').replace(/\u00a0/g,' '),lines=text.split(/\r?\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean),isV39=/V\s*39\s*A|LETTER OF INTRODUCTION FOR VISA APPLICATION/i.test(text),data={},stay={};let section=text;
+ if(isV39){const individual=text.search(/Only for application where Local Contact is an individual/i);if(individual>=0)section=text.slice(individual).split(/Only for application where Local Contact is a company/i)[0];}
+ else{const inviter=text.search(/Inviter Details|Host Details/i);if(inviter>=0)section=text.slice(inviter);}
+ const phone=section.match(/\+65[ -]?\d{4}[ -]?\d{4}\b/),email=section.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);if(phone)data.localPhone=phone[0].replace(/\s/g,'');if(email)data.localEmail=email[0].toUpperCase();
+ if(isV39){const index=lines.findIndex(x=>/Name of Local Contact/i.test(x));if(index>0){const prev=lines[index-1].split(/\+65/)[0].trim();if(/^[A-Z][A-Z .'-]+$/i.test(prev)&&!/^Signature|Date|NRIC/i.test(prev))data.localName=prev.toUpperCase();}}
+ else{const named=section.match(/\bN\s*ame\s*:\s*(?:Mr\.?|Mrs\.?|Ms\.?)?\s*([^\n]+?)(?=\s+Contact Number:|$|\n)/i);if(named)data.localName=named[1].replace(/[●•]/g,'').trim().toUpperCase();if(!data.localName){const author=text.match(/\bI\s*,\s*(?:(?:Mr|Mrs|Ms)\.?\s*)?([A-Z][A-Z .'-]+?)(?=,\s*(?:residing|a\s|am\s)|\s+am writing)/i);if(author)data.localName=author[1].trim().toUpperCase();}}
+ let relationship='';if(isV39){const rel=text.match(/applicant is my\s+([A-Z][A-Z -]*?)(?=\s*\(|\n|\.)/i);if(rel){relationship=rel[1].trim().toUpperCase();data.localRelation=inverseRelationship(relationship);}}
+ else if(/invite my (?:relatives?|family)|family holiday/i.test(text))data.localRelation='RELATIVE';else if(/invite my friends?|visit my friends?|visiting friends/i.test(text))data.localRelation='FRIEND';
+ const addressLine=lines.find(x=>/^\d+[A-Z]?\s*[, ]/.test(x)&&/SINGAPORE/i.test(x)&&(/#\d|\b\d{6}\b|\bSTREET\b|\bROAD\b|\bAVENUE\b/i.test(x))&&!/Date|passport/i.test(x));
+ let address='';if(addressLine){address=addressLine.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig,'').trim().toUpperCase();const block=address.match(/^(\d+[A-Z]?)\s*,?\s*/);if(block)stay.block=block[1];const street=address.match(/^\d+[A-Z]?\s*,?\s*([^#]+?)(?=,?\s*#|,\s*SINGAPORE)/i);if(street)stay.street=street[1].replace(/,\s*$/,'').trim();const unit=address.match(/#(\d+)-([A-Z0-9]+)/);if(unit){stay.floor=unit[1];stay.unit=unit[2];}const postal=address.match(/\b(\d{6})\b/);if(postal)stay.postal=postal[1];if(data.localPhone)stay.hotelPhone=data.localPhone;}
+ return {data,stay,address,relationship,type:isV39?'V39A':'INVITATION LETTER',applicantPassports:[...new Set((text.match(/\b[A-Z]\d{7}\b/g)||[]))]};
+}
+
+// Filled V39A PDFs can keep entered values in widgets rather than the text layer.
+export function invitationFormText(annotations){
+ const fields=new Map(annotations.filter(a=>a.subtype==='Widget'&&typeof a.fieldValue==='string').map(a=>[a.fieldName,String(a.fieldValue).trim()]));
+ if(!fields.has('Name of Local Contact')||!fields.has('Address of Local Contact'))return '';
+ const name=fields.get('Name of Local Contact')||'',phone=fields.get('Contact Number')||'',address=fields.get('Address of Local Contact')||'',email=fields.get('Email Address')||'',relation=fields.get('daughter spouse business partner for others please specify')||'';
+ return ['V39A','Only for application where Local Contact is an individual:',name+' '+phone,'Name of Local Contact Contact Number',address+' '+email,'Address of Local Contact Email Address',relation?'The applicant is my '+relation+' (RELATIONSHIP)':'',[...fields.values()].filter(x=>/^[A-Z]\d{7}$/.test(x)).join(' ')].join('\n');
+}

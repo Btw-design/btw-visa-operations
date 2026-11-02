@@ -1,0 +1,21 @@
+{
+  "name": "btw-singapore-forms",
+  "version": "1.0.0",
+  "description": "Private passport-to-Form-14A draft assistant",
+  "main": "index.js",
+  "scripts": {
+    "check": "node --check dist/app.js && node --check dist/parser.js && node --check dist/hotel-parser.js && node --check dist/schema.js && node --check dist/pdf.js && node --check dist/invitation-parser.js && node --check dist/hotel-defaults.js",
+    "test": "node --test tests/workflow.test.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
+    "i18n-iso-countries": "^7.14.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "tesseract.js": "^7.0.0"
+  }
+}

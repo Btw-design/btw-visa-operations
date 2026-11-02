@@ -9,3 +9,6 @@ uploads/
 *.zip
 *.tar.gz
 .DS_Store
+
+# Redundant uncompressed OCR cache; runtime uses dist/vendor/lang/eng.traineddata.gz
+/eng.traineddata
