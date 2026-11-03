@@ -91,16 +91,16 @@ test('focused landscape OCR recovers printed names and issue date after full-pag
   const p=parsePassport(await recognizePassport({width:1200,height:800},worker));
   assert.equal(p.given,'TEST PERSON');assert.equal(p.surname,'SAMPLE');assert.equal(p.issued,'2018-11-22');
   assert.equal(options.length,4);
-  assert.deepEqual(options[3].rectangle,{left:360,top:128,width:840,height:472});
+  assert.deepEqual(options[3].rectangle,{left:360,top:0,width:840,height:600});
   assert.equal(settings[3].tessedit_char_whitelist,'');
   assert.equal(settings[3].preserve_interword_spaces,'1');
  }finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
 });
-test('portrait documents retain full-page retries without the landscape details crop',async()=>{
+test('portrait and stacked documents use bounded lower and middle MRZ retries',async()=>{
  const previous=globalThis.document;let calls=0;
  globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({drawImage(){}})})};
  const worker={setParameters:async()=>{},recognize:async()=>{calls++;return {data:{text:'unreadable'}};}};
- try{await recognizePassport({width:800,height:1200},worker);assert.equal(calls,3);}
+ try{await recognizePassport({width:800,height:1200},worker);assert.equal(calls,5);}
  finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
 });
 test('OCR errors restore worker parameters instead of leaking the MRZ whitelist to the next document',async()=>{const calls=[];const worker={setParameters:async p=>calls.push(p),recognize:async()=>{throw Error('worker failed');}};await assert.rejects(()=>recognizePassport({},worker),/worker failed/);assert.equal(calls.at(-1).tessedit_char_whitelist,'');});
@@ -177,4 +177,74 @@ test('conflicting names across OCR passes remain empty unless printed text corro
 });
 test('conflicting checksum-valid identities cannot be combined into a fabricated passport',()=>{
  const p=parsePassport(mrz()+'\n'+mrz('B1234567<'));assert.equal(p.passport,undefined);assert.equal(p.dob,undefined);
+});
+
+test('bilingual Indian visual labels accept two-letter passport numbers without requiring an MRZ',()=>{
+ const text=visual.replace('A1234567','AB123456').replace('Surname\n','Surname / उपनाम\n').replace('Given Name(s)\n','दिया गया नाम / Given Name(s)\n').replace('Place of Birth\n','जन्म स्थान / Place of Birth\n').replace('Date of Issue\n','जारी करने की तिथि / Date of Issue\n');
+ const p=parsePassport(text);
+ assert.equal(p.passport,'AB123456');assert.equal(p.given,'TEST PERSON');assert.equal(p.surname,'SAMPLE');
+ assert.equal(p.issued,'2018-11-22');assert.equal(p.expiry,'2028-11-21');
+ assert.equal(p.birthplace,'MUMBAI');assert.equal(p.birthstate,'MAHARASHTRA');assert.equal(p.birthcountry,'INDIA');assert.equal(p.issueplace,'MUMBAI');
+});
+
+test('Indian birth states can be read without a comma and nationality does not determine birth country',()=>{
+ const p=parsePassport('Place of Birth\nMUMBAI MAHARASHTRA\nNationality\nINDIAN');
+ assert.equal(p.birthplace,'MUMBAI');assert.equal(p.birthstate,'MAHARASHTRA');assert.equal(p.birthcountry,'INDIA');
+ assert.equal(parsePassport('Place of Birth\nLONDON\nNationality\nINDIAN').birthcountry,undefined);
+});
+
+test('old-passport continuation dates never supply the current issue date, regardless of page order',()=>{
+ const back=`Address\n21 EXAMPLE ROAD\nPIN:400054, MAHARASHTRA, INDIA\nOld Passport No. with Date and Place of Issue\nB7654321\nDate of Issue\n01/01/2010\nPlace of Issue\nDELHI\nFile No.\nAB123456789`;
+ const front=visual.replace('Date of Issue\n22/11/2018','');
+ for(const text of [front+'\n--- DOCUMENT PAGE ---\n'+back,back+'\n--- DOCUMENT PAGE ---\n'+front]){
+  const p=parsePassport(text);assert.equal(p.issued,undefined);assert.equal(p.passport,'A1234567');assert.equal(p.issueplace,'MUMBAI');
+  assert.ok(!p.address.includes('B7654321'));assert.ok(!p.address.includes('01/01/2010'));
+ }
+ assert.equal(parsePassport(back).issued,undefined);
+});
+
+test('two-letter MRZ prefixes are preserved when correcting only the numeric positions',()=>{
+ const raw=mrz('AB123458<');
+ assert.equal(parsePassport(raw).passport,'AB123458');
+ assert.equal(parsePassport(raw.replace('AB123458','AB12345B')).passport,'AB123458');
+ assert.equal(parsePassport(raw.replace('AB123458','AB12345B').replace('030119','030118')).passport,undefined);
+});
+
+test('contradictory visual and checksum-verified identities are left for review',()=>{
+ for(const fragment of [visual.replace('A1234567','B7654321'),visual.replace('19/01/2003','20/01/2003'),visual.replace('21/11/2028','22/11/2028')]){
+  const p=parsePassport(fragment+'\n'+mrz());
+  for(const key of ['passport','given','surname','dob','issued','expiry'])assert.equal(p[key],undefined,key);
+ }
+ const p=parsePassport(visual.replace('TEST PERSON','OTHER PERSON')+'\n'+mrz());
+ assert.equal(p.given,undefined);assert.equal(p.surname,'SAMPLE');
+});
+
+test('MRZ verification preserves the visual spelling when only name punctuation differs',()=>{
+ const p=parsePassport(visual.replace('TEST PERSON','TEST-PERSON')+'\n'+mrz());
+ assert.equal(p.given,'TEST-PERSON');assert.equal(p.surname,'SAMPLE');
+});
+
+test('matching alternate passes recover birthplace, state and place of issue',async()=>{
+ const primary=visual.replace('Place of Birth\nMUMBAI, MAHARASHTRA\n','').replace('Place of Issue\nMUMBAI\n','');
+ const alternate=visual.replace('Surname\nSAMPLE\n','').replace('Given Name(s)\nTEST PERSON\n','').replace('Nationality / Sex\nINDIAN F\n','');
+ const {text}=await recognizePasses([primary,alternate]);const p=parsePassport(text);
+ assert.equal(p.given,'TEST PERSON');assert.equal(p.birthplace,'MUMBAI');assert.equal(p.birthstate,'MAHARASHTRA');assert.equal(p.issueplace,'MUMBAI');
+});
+
+test('missing Indian place fields trigger OCR retries even when core identity is complete',()=>{
+ for(const fragment of ['Place of Birth\nMUMBAI, MAHARASHTRA','Place of Issue\nMUMBAI'])assert.equal(passportNeedsRetry(visual.replace(fragment,'')),true);
+});
+
+test('stacked passport images search the upper MRZ band and preserve the passport number header in the visual crop',async()=>{
+ const previous=globalThis.document,options=[];
+ globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({drawImage(){}})})};
+ const texts=['unreadable','unreadable','unreadable',mrz(),visual];
+ const worker={setParameters:async()=>{},recognize:async(surface,opts)=>{options.push(opts);return {data:{text:texts[options.length-1]}};}};
+ try{
+  const p=parsePassport(await recognizePassport({width:1200,height:1600},worker));
+  assert.equal(p.passport,'A1234567');assert.equal(p.issued,'2018-11-22');assert.equal(p.birthstate,'MAHARASHTRA');
+  assert.equal(options.length,5);
+  assert.deepEqual(options[3].rectangle,{left:0,top:560,width:1200,height:320});
+  assert.deepEqual(options[4].rectangle,{left:360,top:0,width:840,height:704});
+ }finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
 });

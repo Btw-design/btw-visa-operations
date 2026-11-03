@@ -16,10 +16,12 @@ export function readPassportMrz(text){
   const birth=digits(row.slice(13,19)),expiry=digits(row.slice(21,27));
   const birthValid=checked(birth,digits(row[19]))&&!!date(birth,true),expiryValid=checked(expiry,digits(row[27]))&&!!date(expiry,false);
   let doc=row.slice(0,9),docValid=checked(doc,digits(row[9]));
-  // Indian passports use a letter, seven digits and one filler in TD3.
-  // Repair only those numeric positions, and require all three field checks.
+  // Indian numbers may have one letter/seven digits or two letters/six digits.
+  // Preserve the letter prefix; accept a repair only when it is unambiguous.
   if(!docValid&&firsts.some(x=>x.issuer==='IND')&&/^[A-Z][A-Z0-9]{7}<$/.test(doc)&&birthValid&&expiryValid){
-   const fixed=doc[0]+digits(doc.slice(1,8))+'<';if(/^[A-Z]\d{7}<$/.test(fixed)&&checked(fixed,digits(row[9]))){doc=fixed;docValid=true;}
+   const fixes=[doc[0]+digits(doc.slice(1,8))+'<',doc.slice(0,2)+digits(doc.slice(2,8))+'<'];
+   const valid=[...new Set(fixes.filter(x=>/^(?:[A-Z]\d{7}|[A-Z]{2}\d{6})<$/.test(x)&&checked(x,digits(row[9]))))];
+   if(valid.length===1){doc=valid[0];docValid=true;}
   }
   if(!docValid||!birthValid||!expiryValid)continue;
   candidates.push({passport:doc.replace(/<+$/,''),dob:date(birth,true),expiry:date(expiry,false),sex:row[20]==='F'?'Female':row[20]==='M'?'Male':'',nationality:nationality==='IND'?'INDIAN':countryNames[nationality]});

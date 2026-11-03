@@ -36,7 +36,7 @@ function prepareBlue(source){
  ctx.putImageData(out,0,0);return canvas;
 }
 
-function score(text){const p=parsePassport(text);return ['passport','given','surname','dob','issued','expiry','sex','nationality'].reduce((n,k)=>n+(p[k]?1:0),0);}
+function score(text){const p=parsePassport(text);return ['passport','given','surname','dob','issued','expiry','sex','nationality','birthplace','birthstate','issueplace'].reduce((n,k)=>n+(p[k]?1:0),0);}
 // Recover missing visual fields only when both passes identify the same passport.
 // MRZ does not contain an issue date, so a better visual pass still matters.
 function recoveredVisualFields(attempts){
@@ -44,10 +44,11 @@ function recoveredVisualFields(attempts){
  if(identity.some(k=>!primary[k]))return '';
  if(parsed.some(p=>identity.some(k=>p[k]&&p[k]!==primary[k])))return '';
  const matching=parsed.filter(p=>identity.every(k=>p[k]===primary[k]));
- const labels={given:'Given Names',surname:'Surname',issued:'Date of Issue'};
+ const labels={given:'Given Names',surname:'Surname',issued:'Date of Issue',birthplace:'Place of Birth',issueplace:'Place of Issue'};
  return Object.entries(labels).flatMap(([key,label])=>{
-  if(primary[key])return [];
-  const values=[...new Set(matching.map(p=>p[key]).filter(Boolean))];
+  if(primary[key]&&!(key==='birthplace'&&!primary.birthstate))return [];
+  const sources=key==='birthplace'?matching.filter(p=>p.birthstate&&(!primary.birthplace||p.birthplace===primary.birthplace)):matching;
+  const values=[...new Set(sources.map(p=>key==='birthplace'&&p[key]?[p[key],p.birthstate].filter(Boolean).join(', '):p[key]).filter(Boolean))];
   if(values.length!==1)return [];
   const value=key==='issued'?values[0].split('-').reverse().join('/'):values[0];
   return [`${label}: ${value}`];
@@ -77,18 +78,25 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
    if(attempts.every(passportNeedsRetry)){
     onRetry('Checking the machine-readable passport lines…');
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',preserve_interword_spaces:'0'});
-    const result=await worker.recognize(enhanced,{rectangle:{left:0,top:Math.floor(canvas.height*.55),width:canvas.width,height:canvas.height-Math.floor(canvas.height*.55)}});
+    const bands=[{left:0,top:Math.floor(canvas.height*.55),width:canvas.width,height:canvas.height-Math.floor(canvas.height*.55)}];
+    // A front and address page may be stacked in one image. The first page's
+    // MRZ then sits near the middle, rather than at the bottom of the image.
+    const ratio=canvas.width/canvas.height;
+    if(ratio>=.55&&ratio<=1)bands.push({left:0,top:Math.floor(canvas.height*.35),width:canvas.width,height:Math.ceil(canvas.height*.20)});
     // Keep this pass separate from visual labels; it is only a candidate MRZ.
-    const mrz=(result.data.text||'').split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
-    if(mrz)machineLines=mrz;
+    for(const rectangle of bands){
+     const result=await worker.recognize(enhanced,{rectangle});
+     const mrz=(result.data.text||'').split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
+     if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
+    }
    }
    // Landscape TD3 pages commonly place the photograph on the left and MRZ
    // at the bottom. Isolate the printed details when full-page OCR is weak.
    // Keep this as another candidate, never a replacement for the full page.
    const ratio=canvas.width/canvas.height;
-   if(attempts.every(passportNeedsRetry)&&ratio>=1.1&&ratio<=1.8){
+   if(attempts.every(passportNeedsRetry)&&((ratio>=1.1&&ratio<=1.8)||(ratio>=.55&&ratio<=1))){
     onRetry('Checking the printed passport details…');
-    const left=Math.floor(canvas.width*.30),top=Math.floor(canvas.height*.16),bottom=Math.ceil(canvas.height*.75);
+    const left=Math.floor(canvas.width*.30),top=0,bottom=Math.ceil(canvas.height*(ratio<=1?.44:.75));
     attempts.push(await run(enhanced,'6','',{left,top,width:canvas.width-left,height:bottom-top}));
    }
   }
