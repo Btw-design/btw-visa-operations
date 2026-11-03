@@ -1,6 +1,6 @@
 import * as pdfjs from './vendor/pdf.min.mjs?v=27fc2a057a00f92a4334ad06e17dbd7259912954e9fb7f76400bcca5fd190a9c';
 import {identifyDistrict} from './address.js?v=3a747d4404ba88a2e17ca483092b14ba305ea85ae4924ae3b86d7da82ed13f47';
-import {parsePassport,passportNeedsRetry,passportWarnings} from './parser.js?v=c52d580c627f5b7c8b03af0e7605881c44344e129b3e2ed0d473db4074770ce5';
+import {parsePassport,passportNeedsRetry,passportWarnings} from './parser.js?v=c1fe8a9876cf76a857aa729dd4a4d7e5c1d9187ad0d1208559e31a97f38f09cf';
 import {recognizePassport} from './passport-ocr.js?v=de9ca43fbc3e4c4090e69bd12e18d614927331debb00bd5f201bde69b435d7b0';
 import {websiteOcrConfig,readWebsitePassport} from './website-ocr.js?v=653ab090c8369d8a097b14a708329cdf33ea0fdd3d9584a55c4c031e74478500';
 import {parseInvitation,invitationFormText} from './invitation-parser.js?v=66a95a94cd8d182c8330bb8b0ac12179c8240ae58b84e11062c85042ee0976fd';
