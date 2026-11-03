@@ -10,7 +10,7 @@ const labels={
  issued:/\b(?:DATE\s*OF\s*ISSUE|ISSUE\s*DATE)\b/i,
  expiry:/\b(?:DATE\s*OF\s*EXPIRY|EXPIRY\s*DATE|DATE\s*OF\s*EXPIRATION)\b/i,
  birthplace:/\bPLACE\s*OF\s*BIRTH\b/i,issueplace:/\bPLACE\s*OF\s*ISSUE\b/i,
- nationality:/\bNATIONALITY\b/i,sex:/\b(?:SEX|GENDER)\b/i,address:/\bADDRESS\b/i
+ nationality:/\bNATIONALITY\b/i,sex:/\b(?:SEX|GENDER)\b/i,issuecountry:/\bCOUNTRY\s+OF\s+ISSUE\b/i,address:/\bADDRESS\b/i
 };
 const datePattern=/\b([0-3]?\d)\s*[/.-]\s*([01]?\d)\s*[/.-]\s*((?:19|20)\d{2})\b/;
 const oldPassport=/\b(?:(?:OLD|PREVIOUS)\s*PASSPORT|FILE\s*(?:NO|NUMBER)|FATHER|MOTHER|SPOUSE)\b/i;
@@ -62,6 +62,8 @@ export function parsePassport(text){
  if(state){const place=cleanName(birthValue.slice(0,-state.length).replace(/[ ,]+$/,''));if(place)out.birthplace=place;else delete out.birthplace;out.birthstate=state;out.birthcountry='INDIA';}
  const issue=cleanName(labelled(current,'issueplace'));if(issue)out.issueplace=issue;
  const mrz=readPassportMrz(text);
+ const issuingCountry=labelled(current,'issuecountry');
+ if(/^(?:IND|INDIA)$/.test(issuingCountry))out.issuecountry='INDIA';
  if(!out.issuecountry&&/REPUBLIC\s+OF\s+INDIA/.test(text))out.issuecountry='INDIA';
  const review=[],differentPassport=out.passport&&mrz.passport&&out.passport!==mrz.passport;
  if(differentPassport){
