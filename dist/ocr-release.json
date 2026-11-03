@@ -1,19 +1,20 @@
 {
-  "appVersion": "5a2956a7a956",
+  "appVersion": "fd430b328a42",
   "files": {
     "address.js": "3a747d4404ba88a2e17ca483092b14ba305ea85ae4924ae3b86d7da82ed13f47",
-    "app.js": "5a2956a7a95620050b303bf3cf1501d05d87ae7d309cb64ca24b440fe93379fd",
+    "app.js": "fd430b328a42c4f13adc67611d9102ae6706051a418062237068f9b953235aeb",
     "countries.js": "376c133b9e9fa19ae30c75d399ba415e41b2ebc74c968c2be6ec36b65eb955cb",
     "hotel-defaults.js": "ac397997aee5485c1ca33a1bf03c772314ddccc97b8da33c305e1d6090897d44",
     "hotel-parser.js": "a828cc872558a0e5b00a0cbfc1c3bdb9bd56d6abab8cc21b99c2ef1e4ab2da7b",
     "invitation-parser.js": "66a95a94cd8d182c8330bb8b0ac12179c8240ae58b84e11062c85042ee0976fd",
-    "parser.js": "c52d580c627f5b7c8b03af0e7605881c44344e129b3e2ed0d473db4074770ce5",
+    "parser.js": "c1fe8a9876cf76a857aa729dd4a4d7e5c1d9187ad0d1208559e31a97f38f09cf",
     "passport-mrz.js": "38f9d0713dbb3cd55d6efc6d2e64cfbeb0508286e47b8f3e92ec0703de1bb314",
-    "passport-ocr.js": "15952ef5a39d84989e4087e8c05a8ef2209b054c3095a2f9b2a9c46228bdd32d",
+    "passport-ocr.js": "de9ca43fbc3e4c4090e69bd12e18d614927331debb00bd5f201bde69b435d7b0",
     "pdf.js": "bd9a417a84bfca2892ed256edaa3a56f8fb73286dc925c9e18621b799a6a1615",
     "postal-directory.js": "97c0c15255bff133463d3695e15f9dfd65d492ffcf765eeb42d640b41284d740",
     "schema.js": "5df55e6f323c5295b63afc823cafb500f36f9f03fa86e4e51978fb783ebb578d",
     "website-ocr.js": "653ab090c8369d8a097b14a708329cdf33ea0fdd3d9584a55c4c031e74478500",
-    "ocr-field-recovery.js": "5e78f35104c952684724414a2af6dd6e581718919e132f0a9e0115ddee2fea2f"
+    "ocr-field-recovery.js": "5e78f35104c952684724414a2af6dd6e581718919e132f0a9e0115ddee2fea2f",
+    "ocr-identity-evidence.js": "6f3fe9d0cb00612ae40583b7fee3356b87fa6cd4b90b8868d177d6265ed0aaf5"
   }
 }
