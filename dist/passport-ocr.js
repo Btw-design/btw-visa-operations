@@ -92,10 +92,11 @@ function recoveredVisualFields(attempts){
  }).join('\n');
 }
 // Shared by the browser reader and the website's PaddleOCR gateway.
-export function combinePassportPasses(attempts,machineLines=''){
+export function combinePassportPasses(attempts,machineLines='',focusedPasses=[]){
  const ordered=attempts.filter(Boolean).slice().sort((a,b)=>score(b)-score(a));
  if(!ordered.length)return machineLines;
  const parsed=ordered.map(parsePassport);
+ const focused=focusedPasses.map(parsePassport);
  // A cropped scan may find a printed field that full-page OCR missed.
  // Only incorporate unanimously consistent values and never merge identities
  // belonging to two different passports.
@@ -105,15 +106,15 @@ export function combinePassportPasses(attempts,machineLines=''){
  const conflicting=numbers.size>1||dates.size>1||expiries.size>1;
  const names={surname:'Surname',given:'Given Names',passport:'Passport No',dob:'Date of Birth',issued:'Date of Issue',expiry:'Date of Expiry',birthplace:'Place of Birth',issueplace:'Place of Issue',nationality:'Nationality',sex:'Sex'};
  const recovered=[];
- if(!conflicting){
+ if(!conflicting&&focused.length){
   for(const [key,label]of Object.entries(names)){
    if(parsed[0][key])continue;
-   const values=[...new Set(parsed.map(p=>p[key]).filter(Boolean))];
+   const values=[...new Set(focused.map(p=>p[key]).filter(Boolean))];
    if(values.length!==1)continue;
    let value=values[0];
    if(['dob','issued','expiry'].includes(key))value=value.split('-').reverse().join('/');
-   if(key==='birthplace'&&parsed.some(p=>p.birthplace===values[0]&&p.birthstate)){
-    const states=[...new Set(parsed.filter(p=>p.birthplace===values[0]).map(p=>p.birthstate).filter(Boolean))];
+   if(key==='birthplace'&&focused.some(p=>p.birthplace===values[0]&&p.birthstate)){
+    const states=[...new Set(focused.filter(p=>p.birthplace===values[0]).map(p=>p.birthstate).filter(Boolean))];
     if(states.length===1)value+=', '+states[0];
    }
    recovered.push(label+': '+value);
@@ -128,7 +129,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
   await worker.setParameters({tessedit_pageseg_mode:mode,tessedit_char_whitelist:whitelist,preserve_interword_spaces:'1',user_defined_dpi:'300'});
   return (await worker.recognize(surface,rectangle?{rectangle}:{rotateAuto})).data.text||'';
  };
- const attempts=[];let enhanced,blue,machineLines='';const extraSurfaces=[];
+ const attempts=[];let enhanced,blue,machineLines='';const extraSurfaces=[],focusedPasses=[];
  try{
   attempts.push(await run(canvas,'3'));
   if(passportNeedsRetry(attempts[0])){
@@ -177,7 +178,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
    // An Indian passport's security pattern can bury the right-side
    // printed fields. OCR the upper identity block and lower date block
    // separately so readable text is not lost in the full-page layout.
-   if(attempts.every(passportNeedsRetry)&&canvas.width>=320&&canvas.height>=240){
+   if(attempts.every(passportNeedsRetry)&&canvas.width>=320&&canvas.height>=240&&typeof enhanced?.getContext('2d')?.getImageData==='function'){
     onRetry('Checking passport number, names and printed dates…');
     const blocks=[
      {left:Math.floor(canvas.width*.30),top:Math.floor(canvas.height*.10),width:Math.ceil(canvas.width*.69),height:Math.ceil(canvas.height*.48)},
@@ -185,7 +186,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
     ];
     for(const block of blocks){
      const text=await run(enhanced,'6','',block,false);
-     if(text.trim())attempts.push(text);
+     if(text.trim())focusedPasses.push(text);
     }
    }
    // Landscape TD3 pages commonly place the photograph on the left and MRZ
@@ -200,7 +201,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
   }
   // Preserve MRZ candidates for conflict checks; fill missing visual fields only
   // from passes corroborated by all three identity fields.
-  return combinePassportPasses(attempts,machineLines);
+  return combinePassportPasses(attempts,machineLines,focusedPasses);
  }finally{
   if(enhanced){enhanced.width=0;enhanced.height=0;}
   if(blue){blue.width=0;blue.height=0;}
