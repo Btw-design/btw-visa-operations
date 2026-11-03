@@ -269,3 +269,23 @@ test('stacked passport images search the upper MRZ band and preserve the passpor
   assert.deepEqual(options[4].rectangle,{left:360,top:0,width:840,height:704});
  }finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
 });
+
+test('browser adaptive MRZ fallback recovers a checked identity and frees temporary canvases',async()=>{
+ const previous=globalThis.document,allocated=[];
+ globalThis.document={createElement:()=>{
+  const canvas={width:0,height:0,getContext(){return {
+   fillRect(){},drawImage(){},putImageData(){},
+   getImageData(){const data=new Uint8ClampedArray(canvas.width*canvas.height*4);data.fill(220);return {data};}
+  };}};allocated.push(canvas);return canvas;
+ }};
+ const original={width:1200,height:800,getContext(){return {getImageData(){}}}};
+ let count=0;
+ const worker={setParameters:async()=>{},recognize:async()=>({data:{text:++count===4?mrz():'unreadable'}})};
+ try{
+  const read=parsePassport(await recognizePassport(original,worker));
+  assert.equal(read.passport,'A1234567');
+  assert.equal(read.dob,'2003-01-19');
+  assert.ok(count>=4);
+  assert.ok(allocated.every(c=>c.width===0&&c.height===0));
+ }finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
+});
