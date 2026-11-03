@@ -39,8 +39,70 @@ test('numeric OCR substitutions in MRZ require passing check digits',()=>{const 
 test('passport surname may be absent without making up a surname',()=>{const p=parsePassport('Surname\nGiven Name(s)\nTEST PERSON\nPassport No. A1234567');assert.equal(p.surname,undefined);assert.equal(p.given,'TEST PERSON');});
 test('addresses do not absorb other passport pages or old passport data',()=>{const p=parsePassport('/ Address\n21 EXAMPLE ROAD\nPIN:700006, WEST BENGAL, INDIA\n--- DOCUMENT PAGE ---\nDate of Birth\n19/01/2003');assert.equal(p.address,'21 EXAMPLE ROAD, PIN:700006, WEST BENGAL, INDIA');assert.equal(p.district,'KOLKATA');});
 test('empty/unreadable input has no false successful details',()=>{assert.deepEqual(parsePassport('...'),{});assert.equal(passportNeedsRetry('...'),true);});
+test('a missing issue date or either name requests another OCR pass',()=>{
+ for(const fragment of ['Date of Issue\n22/11/2018','Given Name(s)\nTEST PERSON','Surname\nSAMPLE']){
+  assert.equal(passportNeedsRetry(visual.replace(fragment,'')),true,fragment);
+ }
+});
+async function recognizePasses(texts){
+ const previous=globalThis.document;
+ globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({drawImage(){}})})};
+ let calls=0;
+ const worker={setParameters:async()=>{},recognize:async()=>({data:{text:texts[calls++]||''}})};
+ try{return {text:await recognizePassport({width:1200,height:800},worker),calls};}
+ finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
+}
+test('a second visual pass recovers an issue date when the higher-scoring pass lacks it',async()=>{
+ const primary=visual.replace('Date of Issue\n22/11/2018','');
+ const secondary=visual.replace('Nationality / Sex\nINDIAN F\n','');
+ const result=await recognizePasses([primary,secondary]);
+ assert.equal(result.calls,2);
+ const p=parsePassport(result.text);assert.equal(p.issued,'2018-11-22');assert.equal(p.nationality,'INDIAN');assert.equal(p.sex,'Female');
+});
+test('a second visual pass recovers either missing name with a matching passport identity',async()=>{
+ for(const [key,fragment,value] of [['given','Given Name(s)\nTEST PERSON','TEST PERSON'],['surname','Surname\nSAMPLE','SAMPLE']]){
+  const primary=visual.replace(fragment,'');
+  const secondary=visual.replace('Nationality / Sex\nINDIAN F\n','');
+  const result=await recognizePasses([primary,secondary]);
+  assert.equal(result.calls,2);assert.equal(parsePassport(result.text)[key],value);
+ }
+});
+test('alternate visual fields are rejected when identity is conflicting or incomplete',async()=>{
+ const primary=visual.replace('Date of Issue\n22/11/2018','');
+ for(const secondary of [
+  visual.replace('A1234567','B7654321'),
+  visual.replace('19/01/2003','20/01/2003'),
+  visual.replace('21/11/2028','22/11/2028'),
+  visual.replace('Passport No.: A1234567\n','')
+ ]){
+  const result=await recognizePasses([primary,secondary.replace('Nationality / Sex\nINDIAN F\n','')]);
+  assert.equal(parsePassport(result.text).issued,undefined);
+ }
+});
 test('complete primary OCR skips extra passes and restores worker settings',async()=>{const calls=[];const worker={setParameters:async p=>calls.push(p),recognize:async()=>({data:{text:visual}})};assert.equal(await recognizePassport({},worker),visual);assert.deepEqual(calls.map(x=>x.tessedit_pageseg_mode),['3','6']);assert.equal(calls.at(-1).tessedit_char_whitelist,'');});
-test('weak OCR retries contrast and MRZ with bounded calls and frees the canvas',async()=>{let canvas;globalThis.document={createElement:()=>canvas={width:0,height:0,getContext:()=>({drawImage(){}})}};let n=0;const settings=[];const worker={setParameters:async p=>settings.push(p),recognize:async()=>({data:{text:++n===3?mrz():'unreadable'}})};try{const p=parsePassport(await recognizePassport({width:1200,height:800},worker));assert.equal(n,3);assert.equal(p.passport,'A1234567');assert.equal(canvas.width,0);assert.equal(settings.at(-1).tessedit_char_whitelist,'');}finally{delete globalThis.document;}});
+test('weak OCR retries contrast, MRZ and printed details with bounded calls and frees the canvas',async()=>{let canvas;globalThis.document={createElement:()=>canvas={width:0,height:0,getContext:()=>({drawImage(){}})}};let n=0;const settings=[];const worker={setParameters:async p=>settings.push(p),recognize:async()=>({data:{text:++n===3?mrz():'unreadable'}})};try{const p=parsePassport(await recognizePassport({width:1200,height:800},worker));assert.equal(n,4);assert.equal(p.passport,'A1234567');assert.equal(canvas.width,0);assert.equal(settings.at(-1).tessedit_char_whitelist,'');}finally{delete globalThis.document;}});
+test('focused landscape OCR recovers printed names and issue date after full-page passes fail',async()=>{
+ const previous=globalThis.document,settings=[],options=[];
+ globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({drawImage(){}})})};
+ const partial=mrz().replace('TEST<PERSON','TEST<PERS0N');
+ const texts=[partial,partial,partial,visual];
+ const worker={setParameters:async p=>settings.push(p),recognize:async(surface,opts)=>{options.push(opts);return {data:{text:texts[options.length-1]}};}};
+ try{
+  const p=parsePassport(await recognizePassport({width:1200,height:800},worker));
+  assert.equal(p.given,'TEST PERSON');assert.equal(p.surname,'SAMPLE');assert.equal(p.issued,'2018-11-22');
+  assert.equal(options.length,4);
+  assert.deepEqual(options[3].rectangle,{left:360,top:128,width:840,height:472});
+  assert.equal(settings[3].tessedit_char_whitelist,'');
+  assert.equal(settings[3].preserve_interword_spaces,'1');
+ }finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
+});
+test('portrait documents retain full-page retries without the landscape details crop',async()=>{
+ const previous=globalThis.document;let calls=0;
+ globalThis.document={createElement:()=>({width:0,height:0,getContext:()=>({drawImage(){}})})};
+ const worker={setParameters:async()=>{},recognize:async()=>{calls++;return {data:{text:'unreadable'}};}};
+ try{await recognizePassport({width:800,height:1200},worker);assert.equal(calls,3);}
+ finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
+});
 test('OCR errors restore worker parameters instead of leaking the MRZ whitelist to the next document',async()=>{const calls=[];const worker={setParameters:async p=>calls.push(p),recognize:async()=>{throw Error('worker failed');}};await assert.rejects(()=>recognizePassport({},worker),/worker failed/);assert.equal(calls.at(-1).tessedit_char_whitelist,'');});
 
 test('position-specific country and Indian passport OCR repairs pass all three checks',()=>{
