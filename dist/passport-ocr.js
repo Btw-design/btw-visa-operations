@@ -95,8 +95,32 @@ function recoveredVisualFields(attempts){
 export function combinePassportPasses(attempts,machineLines=''){
  const ordered=attempts.filter(Boolean).slice().sort((a,b)=>score(b)-score(a));
  if(!ordered.length)return machineLines;
+ const parsed=ordered.map(parsePassport);
+ // A cropped scan may find a printed field that full-page OCR missed.
+ // Only incorporate unanimously consistent values and never merge identities
+ // belonging to two different passports.
+ const numbers=new Set(parsed.map(p=>p.passport).filter(Boolean));
+ const dates=new Set(parsed.map(p=>p.dob).filter(Boolean));
+ const expiries=new Set(parsed.map(p=>p.expiry).filter(Boolean));
+ const conflicting=numbers.size>1||dates.size>1||expiries.size>1;
+ const names={surname:'Surname',given:'Given Names',passport:'Passport No',dob:'Date of Birth',issued:'Date of Issue',expiry:'Date of Expiry',birthplace:'Place of Birth',issueplace:'Place of Issue',nationality:'Nationality',sex:'Sex'};
+ const recovered=[];
+ if(!conflicting){
+  for(const [key,label]of Object.entries(names)){
+   if(parsed[0][key])continue;
+   const values=[...new Set(parsed.map(p=>p[key]).filter(Boolean))];
+   if(values.length!==1)continue;
+   let value=values[0];
+   if(['dob','issued','expiry'].includes(key))value=value.split('-').reverse().join('/');
+   if(key==='birthplace'&&parsed.some(p=>p.birthplace===values[0]&&p.birthstate)){
+    const states=[...new Set(parsed.filter(p=>p.birthplace===values[0]).map(p=>p.birthstate).filter(Boolean))];
+    if(states.length===1)value+=', '+states[0];
+   }
+   recovered.push(label+': '+value);
+  }
+ }
  const mrz=ordered.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x));
- return [recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
+ return [recovered.join('\n'),recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
 }
 // One worker per read, bounded sequential retries. Nothing is uploaded or logged.
 export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canvas){
@@ -148,6 +172,20 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
      const mrz=extracted.split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
      if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
      if(mrz&&parsePassport(mrz).passport)break;
+    }
+   }
+   // An Indian passport's security pattern can bury the right-side
+   // printed fields. OCR the upper identity block and lower date block
+   // separately so readable text is not lost in the full-page layout.
+   if(attempts.every(passportNeedsRetry)&&canvas.width>=320&&canvas.height>=240){
+    onRetry('Checking passport number, names and printed dates…');
+    const blocks=[
+     {left:Math.floor(canvas.width*.30),top:Math.floor(canvas.height*.10),width:Math.ceil(canvas.width*.69),height:Math.ceil(canvas.height*.48)},
+     {left:Math.floor(canvas.width*.37),top:Math.floor(canvas.height*.57),width:Math.ceil(canvas.width*.62),height:Math.ceil(canvas.height*.23)}
+    ];
+    for(const block of blocks){
+     const text=await run(enhanced,'6','',block,false);
+     if(text.trim())attempts.push(text);
     }
    }
    // Landscape TD3 pages commonly place the photograph on the left and MRZ
