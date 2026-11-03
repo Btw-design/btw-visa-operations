@@ -1,3 +1,4 @@
+import {recoverIdentityEvidence} from './ocr-identity-evidence.js';
 import {recoverOcrFields} from './ocr-field-recovery.js?v=5e78f35104c952684724414a2af6dd6e581718919e132f0a9e0115ddee2fea2f';
 import {parsePassport,passportNeedsRetry} from './parser.js?v=c52d580c627f5b7c8b03af0e7605881c44344e129b3e2ed0d473db4074770ce5';
 
@@ -123,7 +124,22 @@ export function combinePassportPasses(attempts,machineLines='',focusedPasses=[])
  }
  const corroborated=recoverOcrFields([...attempts,...focusedPasses]);
  const mrz=ordered.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||(/^[A-Z0-9<]{28,44}$/.test(x)&&/[FM<]/.test(x[20])));
- return [corroborated.lines,recovered.join('\n'),recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
+ const combined=[
+  corroborated.lines,
+  recovered.join('\n'),
+  recoveredVisualFields(ordered),
+  ordered[0],
+  ...mrz,
+  machineLines
+ ].filter(Boolean).join('\n');
+ const accepted=parsePassport(combined);
+ const verified=recoverIdentityEvidence([...attempts,...focusedPasses],accepted);
+ const labels={dob:'Date of Birth',sex:'Sex',issueplace:'Place of Issue',issuecountry:'Country of Issue'};
+ const extra=Object.entries(verified).map(([key,value])=>{
+  if(key==='dob')value=value.split('-').reverse().join('/');
+  return labels[key]+': '+value;
+ }).join('\n');
+ return [extra,combined].filter(Boolean).join('\n');
 }
 // One worker per read, bounded sequential retries. Nothing is uploaded or logged.
 export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canvas,onDebug=()=>{}){
