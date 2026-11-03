@@ -1,4 +1,4 @@
-import {recoverOcrFields} from './ocr-field-recovery.js';
+import {recoverOcrFields} from './ocr-field-recovery.js?v=5e78f35104c952684724414a2af6dd6e581718919e132f0a9e0115ddee2fea2f';
 import {parsePassport,passportNeedsRetry} from './parser.js?v=c52d580c627f5b7c8b03af0e7605881c44344e129b3e2ed0d473db4074770ce5';
 
 // Background suppression and separable Lanczos resampling for small scans.
