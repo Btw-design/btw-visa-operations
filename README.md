@@ -83,3 +83,8 @@ A work-email/password server is now available for external hosting. See [COMPANY
 ## Restored passport OCR fixes
 
 The current passport reader supports English visual labels, validated TD3 machine-readable data, labelled dates, enhanced-contrast retries and clearer missing-field messages. It does not assign dates by their order in OCR text. See [OCR-UPDATE.md](OCR-UPDATE.md) to update the existing static Hostinger site. Run `npm run test:passport` for extraction regression tests.
+
+
+## Low-resolution passport OCR update
+
+Small images now receive up to four-times bounded scaling. Machine-readable country codes tolerate positional letter/digit OCR confusion; Indian document-number digit repairs require valid number, birth-date and expiry-date checks. Conflicting valid identities are rejected, and conflicting OCR name readings are left blank unless independently corroborated by printed text. Names are not subjected to global digit substitutions. A supplied 405-by-310-pixel passport image was tested locally: seven document fields were recovered correctly, while names and the issue date remained blank for manual review. Real customer text and images are not included in source or regression fixtures.

@@ -78,7 +78,7 @@ async function documentText(file,reader,passport=false){
  }
  if(!['image/jpeg','image/png'].includes(file.type)&&!(/\.(jpe?g|png)$/i.test(file.name)&&!file.type))throw Error('Use PDF, JPG or PNG files.');
  const bitmap=await createImageBitmap(file),canvas=document.createElement('canvas');
- const longest=Math.max(bitmap.width,bitmap.height),scale=passport?Math.min(2,3200/longest):Math.min(1,2200/longest);
+ const longest=Math.max(bitmap.width,bitmap.height),scale=passport?Math.min(4,3200/longest):Math.min(1,2200/longest);
  canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
  try{const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();return [await recognize(canvas)];}
  finally{canvas.width=0;canvas.height=0;}

@@ -42,3 +42,23 @@ test('empty/unreadable input has no false successful details',()=>{assert.deepEq
 test('complete primary OCR skips extra passes and restores worker settings',async()=>{const calls=[];const worker={setParameters:async p=>calls.push(p),recognize:async()=>({data:{text:visual}})};assert.equal(await recognizePassport({},worker),visual);assert.deepEqual(calls.map(x=>x.tessedit_pageseg_mode),['3','6']);assert.equal(calls.at(-1).tessedit_char_whitelist,'');});
 test('weak OCR retries contrast and MRZ with bounded calls and frees the canvas',async()=>{let canvas;globalThis.document={createElement:()=>canvas={width:0,height:0,getContext:()=>({drawImage(){}})}};let n=0;const settings=[];const worker={setParameters:async p=>settings.push(p),recognize:async()=>({data:{text:++n===3?mrz():'unreadable'}})};try{const p=parsePassport(await recognizePassport({width:1200,height:800},worker));assert.equal(n,3);assert.equal(p.passport,'A1234567');assert.equal(canvas.width,0);assert.equal(settings.at(-1).tessedit_char_whitelist,'');}finally{delete globalThis.document;}});
 test('OCR errors restore worker parameters instead of leaking the MRZ whitelist to the next document',async()=>{const calls=[];const worker={setParameters:async p=>calls.push(p),recognize:async()=>{throw Error('worker failed');}};await assert.rejects(()=>recognizePassport({},worker),/worker failed/);assert.equal(calls.at(-1).tessedit_char_whitelist,'');});
+
+test('position-specific country and Indian passport OCR repairs pass all three checks',()=>{
+ const damaged=mrz().replace('P<IND','P<1ND').replace('A1234567','A123456T').replace('IND030119','1ND030119');
+ const p=parsePassport(damaged);assert.equal(p.passport,'A1234567');assert.equal(p.issuecountry,'INDIA');assert.equal(p.dob,'2003-01-19');assert.equal(p.expiry,'2028-11-21');
+});
+test('numeric corrections cannot rescue a passport when another checked field is invalid',()=>{
+ const damaged=mrz().replace('A1234567','A123456T').replace('030119','030118');
+ const p=parsePassport(damaged);assert.equal(p.passport,undefined);assert.equal(p.dob,undefined);
+});
+test('filler-truncated MRZ names are supported when the complete number line validates',()=>{
+ const raw=mrz().split('\n');raw[0]=raw[0].slice(0,38);const p=parsePassport(raw.join('\n'));assert.equal(p.surname,'SAMPLE');assert.equal(p.given,'TEST PERSON');
+});
+test('conflicting names across OCR passes remain empty unless printed text corroborates one',()=>{
+ const raw=mrz(),bad=raw.split('\n')[0].replace('TEST<PERSON','TEST<PERSOM');
+ const p=parsePassport(raw+'\n'+bad);assert.equal(p.surname,'SAMPLE');assert.equal(p.given,undefined);
+ assert.equal(parsePassport(raw+'\n'+bad+'\nTEST PERSON').given,'TEST PERSON');
+});
+test('conflicting checksum-valid identities cannot be combined into a fabricated passport',()=>{
+ const p=parsePassport(mrz()+'\n'+mrz('B1234567<'));assert.equal(p.passport,undefined);assert.equal(p.dob,undefined);
+});

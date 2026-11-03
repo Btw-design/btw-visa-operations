@@ -1,5 +1,6 @@
 import {countryNames} from './countries.js';
 import {identifyDistrict} from './address.js';
+import {readPassportMrz} from './passport-mrz.js';
 
 const labels={
  surname:/\bSURNAME\b/i,
@@ -36,8 +37,6 @@ function labelled(lines,key){
  }
  return '';
 }
-function checkDigit(value,digit){if(!/^\d$/.test(digit))return false;const w=[7,3,1];let sum=0;for(let i=0;i<value.length;i++){const c=value[i],n=c==='<'?0:/\d/.test(c)?+c:c.charCodeAt(0)-55;if(n<0||n>35)return false;sum+=n*w[i%3];}return sum%10===+digit;}
-function mrzDate(s,birth){if(!/^\d{6}$/.test(s))return '';let year=2000+(+s.slice(0,2));const today=new Date().toISOString().slice(0,10);if(birth&&`${year}-${s.slice(2,4)}-${s.slice(4,6)}`>today)year-=100;return validDate(year,+s.slice(2,4),+s.slice(4,6))?`${year}-${s.slice(2,4)}-${s.slice(4,6)}`:'';}
 export function passportNeedsRetry(text){const p=parsePassport(text);return ['passport','dob','expiry'].some(k=>!p[k])||(!p.given&&!p.surname);}
 export function passportWarnings(p){const missing=[['given','given name'],['surname','surname'],['passport','passport number'],['dob','date of birth'],['issued','issue date'],['expiry','expiry date']].filter(([k])=>!p[k]).map(([,label])=>label);return missing.length?`Not read reliably: ${missing.join(', ')}. Check the original and enter missing details.`:'';}
 export function parsePassport(text){
@@ -50,24 +49,9 @@ export function parsePassport(text){
  const birthValue=labelled(lines,'birthplace'),birth=birthValue.match(/^([A-Z][A-Z .'-]*?)(?:\s*,\s*|\s{2,})([A-Z][A-Z .'-]*)$/);
  if(birth){out.birthplace=birth[1].trim();out.birthstate=birth[2].trim();}else{const v=cleanName(birthValue);if(v)out.birthplace=v;}
  const issue=cleanName(labelled(lines,'issueplace'));if(issue)out.issueplace=issue;
- const mrz=lines.map(x=>x.replace(/[«‹＜]/g,'<').replace(/\s/g,'')).filter(x=>/^[A-Z0-9<]+$/.test(x));
- const first=mrz.find(x=>/^P<[A-Z]{3}/.test(x)),issuer=first?.slice(2,5);
- if(issuer&&countryNames[issuer])out.issuecountry=countryNames[issuer];else if(/REPUBLIC\s+OF\s+INDIA/.test(text))out.issuecountry='INDIA';
- const second=mrz.find(x=>x.length===44&&/^[A-Z0-9<]{9}\d[A-Z<]{3}[A-Z0-9]{6}\d[FM<]/.test(x));
- if(first&&second){
-  const numeric=s=>s.replace(/[OQ]/g,'0').replace(/[IL]/g,'1').replace(/Z/g,'2').replace(/S/g,'5').replace(/B/g,'8');
-  const doc=second.slice(0,9),dob=numeric(second.slice(13,19)),expiry=numeric(second.slice(21,27));
-  const dv=checkDigit(doc,second[9]),bv=checkDigit(dob,second[19]),ev=checkDigit(expiry,second[27]);
-  if(dv)out.passport=doc.replace(/<+$/,'');
-  if(bv&&!out.dob){const v=mrzDate(dob,true);if(v)out.dob=v;}
-  if(ev&&!out.expiry){const v=mrzDate(expiry,false);if(v)out.expiry=v;}
-  if(dv&&bv&&ev&&first.length===44){
-   const names=first.slice(5).split('<<'),surname=cleanName(names[0].replace(/</g,' ').trim()),given=cleanName((names[1]||'').replace(/</g,' ').trim());
-   if(surname&&!out.surname)out.surname=surname;if(given&&!out.given)out.given=given;
-   if(!out.sex&&/[FM]/.test(second[20]))out.sex=second[20]==='F'?'Female':'Male';
-   const n=second.slice(10,13);if(n==='IND')out.nationality='INDIAN';else if(countryNames[n])out.nationality=countryNames[n];
-  }
- }
+ const mrz=readPassportMrz(text);
+ if(!out.issuecountry&&/REPUBLIC\s+OF\s+INDIA/.test(text))out.issuecountry='INDIA';
+ for(const [key,value]of Object.entries(mrz))if(!out[key]||key==='passport')out[key]=value;
  if(out.passport)out.documentType='International Passport';
  // Never silently swap dates or populate a contradictory chronology.
  if(out.issued&&out.expiry&&out.issued>=out.expiry){delete out.issued;delete out.expiry;}

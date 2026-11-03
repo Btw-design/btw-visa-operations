@@ -20,13 +20,13 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{}){
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',preserve_interword_spaces:'0'});
     const result=await worker.recognize(enhanced,{rectangle:{left:0,top:Math.floor(canvas.height*.55),width:canvas.width,height:canvas.height-Math.floor(canvas.height*.55)}});
     // Keep this pass separate from visual labels; it is only a candidate MRZ.
-    const mrz=(result.data.text||'').split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
+    const mrz=(result.data.text||'').split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
     if(mrz)machineLines=mrz;
    }
   }
   attempts.sort((a,b)=>score(b)-score(a));
   // Other passes contribute MRZ candidates only, not conflicting labelled dates/names.
-  const mrz=attempts.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x));
+  const mrz=attempts.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x));
   return [attempts[0],...mrz,machineLines].filter(Boolean).join('\n');
  }finally{
   if(enhanced){enhanced.width=0;enhanced.height=0;}
