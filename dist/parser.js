@@ -1,6 +1,6 @@
 import {countryNames} from './countries.js?v=376c133b9e9fa19ae30c75d399ba415e41b2ebc74c968c2be6ec36b65eb955cb';
 import {identifyDistrict} from './address.js?v=3a747d4404ba88a2e17ca483092b14ba305ea85ae4924ae3b86d7da82ed13f47';
-import {readPassportMrz} from './passport-mrz.js?v=6201e64c703536310477078621d2c5ff5c553a27584f732493bddbe9ad144ee0';
+import {readPassportMrz} from './passport-mrz.js?v=38f9d0713dbb3cd55d6efc6d2e64cfbeb0508286e47b8f3e92ec0703de1bb314';
 
 const labels={
  surname:/\bSURNAME\b/i,
