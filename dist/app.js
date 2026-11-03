@@ -1,7 +1,7 @@
 import * as pdfjs from './vendor/pdf.min.mjs?v=27fc2a057a00f92a4334ad06e17dbd7259912954e9fb7f76400bcca5fd190a9c';
 import {identifyDistrict} from './address.js?v=3a747d4404ba88a2e17ca483092b14ba305ea85ae4924ae3b86d7da82ed13f47';
 import {parsePassport,passportNeedsRetry,passportWarnings} from './parser.js?v=3684b54660747a0f85433c14dfc8a3ac6c76161316cd6867f1ff49fd377ff7b3';
-import {recognizePassport} from './passport-ocr.js?v=passport-image-fix-20261103c';
+import {recognizePassport} from './passport-ocr.js?v=ce442fad6130d294fbc431c6885c0afb4a52a21350e60eef2226dfba16f29489';
 import {websiteOcrConfig,readWebsitePassport} from './website-ocr.js?v=653ab090c8369d8a097b14a708329cdf33ea0fdd3d9584a55c4c031e74478500';
 import {parseInvitation,invitationFormText} from './invitation-parser.js?v=66a95a94cd8d182c8330bb8b0ac12179c8240ae58b84e11062c85042ee0976fd';
 import {defaultHotelPatch} from './hotel-defaults.js?v=ac397997aee5485c1ca33a1bf03c772314ddccc97b8da33c305e1d6090897d44';
