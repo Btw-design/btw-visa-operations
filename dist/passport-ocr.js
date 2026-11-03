@@ -178,7 +178,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
    // An Indian passport's security pattern can bury the right-side
    // printed fields. OCR the upper identity block and lower date block
    // separately so readable text is not lost in the full-page layout.
-   if(attempts.every(passportNeedsRetry)&&canvas.width>=320&&canvas.height>=240&&typeof enhanced?.getContext('2d')?.getImageData==='function'){
+   if(attempts.every(passportNeedsRetry)&&canvas.width>=320&&canvas.height>=240&&Math.max(source.width,source.height)>800&&typeof enhanced?.getContext('2d')?.getImageData==='function'){
     onRetry('Checking passport number, names and printed dates…');
     const blocks=[
      {left:Math.floor(canvas.width*.30),top:Math.floor(canvas.height*.10),width:Math.ceil(canvas.width*.69),height:Math.ceil(canvas.height*.48)},
