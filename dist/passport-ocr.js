@@ -124,25 +124,27 @@ export function combinePassportPasses(attempts,machineLines='',focusedPasses=[])
  return [recovered.join('\n'),recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
 }
 // One worker per read, bounded sequential retries. Nothing is uploaded or logged.
-export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canvas){
- const run=async(surface,mode,whitelist='',rectangle,rotateAuto=true)=>{
+export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canvas,onDebug=()=>{}){
+ const run=async(surface,mode,whitelist='',rectangle,rotateAuto=true,label='ocr-pass')=>{
   await worker.setParameters({tessedit_pageseg_mode:mode,tessedit_char_whitelist:whitelist,preserve_interword_spaces:'1',user_defined_dpi:'300'});
-  return (await worker.recognize(surface,rectangle?{rectangle}:{rotateAuto})).data.text||'';
+  const raw=(await worker.recognize(surface,rectangle?{rectangle}:{rotateAuto})).data.text||'';
+  onDebug({stage:label,mode,rectangle:rectangle||null,imageWidth:surface.width,imageHeight:surface.height,raw,parsed:parsePassport(raw)});
+  return raw;
  };
  const attempts=[];let enhanced,blue,machineLines='';const extraSurfaces=[],focusedPasses=[];
  try{
-  attempts.push(await run(canvas,'3'));
+  attempts.push(await run(canvas,'3','',undefined,true,'01-original-full-page'));
   if(passportNeedsRetry(attempts[0])){
    onRetry('Checking passport again with enhanced contrast…');
    enhanced=document.createElement('canvas');enhanced.width=canvas.width;enhanced.height=canvas.height;
    const ctx=enhanced.getContext('2d');ctx.filter='grayscale(1) contrast(1.35)';ctx.drawImage(canvas,0,0);
-   attempts.push(await run(enhanced,'6'));
+   attempts.push(await run(enhanced,'6','',undefined,true,'02-contrast-full-page'));
    // Work from native pixels: enlarging an already enlarged scan loses fine
    // strokes. A blue-channel pass suppresses cyan security backgrounds.
    if(attempts.every(passportNeedsRetry)&&Math.min(source.width,source.height)>=32&&Math.max(source.width,source.height)<=800){
     onRetry('Checking the small passport image with reduced background colour…');
     blue=prepareBlue(source);
-    attempts.push(await run(blue,'3','',undefined,false));
+    attempts.push(await run(blue,'3','',undefined,false,'03-blue-channel'));
    }
    if(attempts.every(passportNeedsRetry)){
     onRetry('Checking the machine-readable passport lines…');
@@ -155,6 +157,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
     // Keep this pass separate from visual labels; it is only a candidate MRZ.
     for(const rectangle of bands){
      const result=await worker.recognize(enhanced,{rectangle});
+     onDebug({stage:'04-mrz-rectangle',mode:'6',rectangle,imageWidth:enhanced.width,imageHeight:enhanced.height,raw:result.data.text||'',parsed:parsePassport(result.data.text||'')});
      const mrz=(result.data.text||'').split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||(/^[A-Z0-9<]{28,44}$/.test(x)&&/[FM<]/.test(x[20]))).join('\n');
      if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
     }
@@ -169,7 +172,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
      if(!band)continue;
      extraSurfaces.push(band);
      onRetry('Checking high-contrast passport machine-readable lines…');
-     const extracted=await run(band,'6','ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',undefined,false);
+     const extracted=await run(band,'6','ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',undefined,false,'05-adaptive-mrz-band');
      const mrz=extracted.split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||(/^[A-Z0-9<]{28,44}$/.test(x)&&/[FM<]/.test(x[20]))).join('\n');
      if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
      if(mrz&&parsePassport(mrz).passport)break;
@@ -185,7 +188,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
      {left:Math.floor(canvas.width*.37),top:Math.floor(canvas.height*.57),width:Math.ceil(canvas.width*.62),height:Math.ceil(canvas.height*.23)}
     ];
     for(const block of blocks){
-     const text=await run(enhanced,'6','',block,false);
+     const text=await run(enhanced,'6','',block,false,'06-focused-printed-block');
      if(text.trim())focusedPasses.push(text);
     }
    }
@@ -196,12 +199,14 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
    if(attempts.every(passportNeedsRetry)&&((ratio>=1.1&&ratio<=1.8)||(ratio>=.55&&ratio<=1))){
     onRetry('Checking the printed passport details…');
     const left=Math.floor(canvas.width*.30),top=0,bottom=Math.ceil(canvas.height*(ratio<=1?.44:.75));
-    attempts.push(await run(enhanced,'6','',{left,top,width:canvas.width-left,height:bottom-top}));
+    attempts.push(await run(enhanced,'6','',{left,top,width:canvas.width-left,height:bottom-top},true,'07-printed-details'));
    }
   }
   // Preserve MRZ candidates for conflict checks; fill missing visual fields only
   // from passes corroborated by all three identity fields.
-  return combinePassportPasses(attempts,machineLines,focusedPasses);
+  const combined=combinePassportPasses(attempts,machineLines,focusedPasses);
+  onDebug({stage:'08-merged-ocr-text',raw:combined,parsed:parsePassport(combined)});
+  return combined;
  }finally{
   if(enhanced){enhanced.width=0;enhanced.height=0;}
   if(blue){blue.width=0;blue.height=0;}
