@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local OCR Diagnostic — BTW VISA</title></head>
+<body>
+<p id="loader">Opening the normal application with on-device OCR diagnostics…</p>
+<script>
+(async()=>{
+ const loader=document.getElementById('loader');
+ try{
+  const response=await fetch('./index.html',{cache:'no-store'});
+  if(!response.ok)throw new Error('Cannot retrieve the application index: HTTP '+response.status);
+  let markup=await response.text();
+  const point='<script type="module" src="app.js';
+  if(!markup.includes(point))throw new Error('Application entrypoint not found in index.html');
+  markup=markup.replace(point,'<script src="ocr-diagnostics.js"><\/script>'+point);
+  history.replaceState(null,'',location.pathname+'?ocr_debug=1');
+  document.open();document.write(markup);document.close();
+ }catch(error){loader.textContent='Diagnostic page failed to start: '+error.message;}
+})();
+</script>
+</body>
+</html>
