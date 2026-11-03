@@ -36,6 +36,43 @@ function prepareBlue(source){
  ctx.putImageData(out,0,0);return canvas;
 }
 
+// Adaptive thresholding on the MRZ region only.
+function prepareMrzBand(source,topFraction,bottomFraction){
+ const w=source.width,h=source.height;
+ if(!Number.isFinite(w)||!Number.isFinite(h)||w<120||h<120)return null;
+ const top=Math.floor(h*topFraction),height=Math.max(1,Math.ceil(h*bottomFraction)-top);
+ const scale=Math.min(2.5,2200/w,1050/height);
+ if(scale<=0)return null;
+ const nw=Math.max(1,Math.round(w*scale)),nh=Math.max(1,Math.round(height*scale));
+ const canvas=document.createElement('canvas');canvas.width=nw;canvas.height=nh;
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});
+ if(!ctx||typeof ctx.getImageData!=='function'){canvas.width=canvas.height=0;return null;}
+ try{
+  ctx.fillStyle='white';ctx.fillRect(0,0,nw,nh);
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(source,0,top,w,height,0,0,nw,nh);
+  const pixels=ctx.getImageData(0,0,nw,nh),data=pixels.data;
+  const stride=nw+1,integral=new Float64Array(stride*(nh+1));
+  for(let y=0;y<nh;y++){
+   let row=0;
+   for(let x=0;x<nw;x++){
+    const i=(y*nw+x)*4;
+    const luminance=(77*data[i]+150*data[i+1]+29*data[i+2])>>8;
+    row+=luminance;integral[(y+1)*stride+x+1]=integral[y*stride+x+1]+row;
+    data[i]=data[i+1]=data[i+2]=luminance;
+   }
+  }
+  const radius=Math.max(9,Math.min(32,Math.round(nw/85)));
+  for(let y=0;y<nh;y++)for(let x=0;x<nw;x++){
+   const x0=Math.max(0,x-radius),x1=Math.min(nw-1,x+radius),y0=Math.max(0,y-radius),y1=Math.min(nh-1,y+radius);
+   const local=(integral[(y1+1)*stride+x1+1]-integral[y0*stride+x1+1]-integral[(y1+1)*stride+x0]+integral[y0*stride+x0])/((x1-x0+1)*(y1-y0+1));
+   const i=(y*nw+x)*4,v=data[i]<Math.min(235,local-12)?0:255;
+   data[i]=data[i+1]=data[i+2]=v;data[i+3]=255;
+  }
+  ctx.putImageData(pixels,0,0);return canvas;
+ }catch(e){canvas.width=canvas.height=0;return null;}
+}
+
 function score(text){const p=parsePassport(text);return ['passport','given','surname','dob','issued','expiry','sex','nationality','birthplace','birthstate','issueplace'].reduce((n,k)=>n+(p[k]?1:0),0);}
 // Recover missing visual fields only when both passes identify the same passport.
 // MRZ does not contain an issue date, so a better visual pass still matters.
@@ -67,7 +104,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
   await worker.setParameters({tessedit_pageseg_mode:mode,tessedit_char_whitelist:whitelist,preserve_interword_spaces:'1',user_defined_dpi:'300'});
   return (await worker.recognize(surface,rectangle?{rectangle}:{rotateAuto})).data.text||'';
  };
- const attempts=[];let enhanced,blue,machineLines='';
+ const attempts=[];let enhanced,blue,machineLines='';const extraSurfaces=[];
  try{
   attempts.push(await run(canvas,'3'));
   if(passportNeedsRetry(attempts[0])){
@@ -97,6 +134,22 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
      if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
     }
    }
+   // Recover machine-readable lines from security-patterned passport scans.
+   if(attempts.every(passportNeedsRetry)&&source.width>=120&&source.height>=120){
+    const aspect=source.width/source.height;
+    const ranges=[[.68,1]];
+    if(aspect>=.5&&aspect<=1)ranges.push([.32,.62]);
+    for(const [start,end] of ranges){
+     const band=prepareMrzBand(source,start,end);
+     if(!band)continue;
+     extraSurfaces.push(band);
+     onRetry('Checking high-contrast passport machine-readable lines…');
+     const extracted=await run(band,'6','ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',undefined,false);
+     const mrz=extracted.split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
+     if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
+     if(mrz&&parsePassport(mrz).passport)break;
+    }
+   }
    // Landscape TD3 pages commonly place the photograph on the left and MRZ
    // at the bottom. Isolate the printed details when full-page OCR is weak.
    // Keep this as another candidate, never a replacement for the full page.
@@ -113,6 +166,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
  }finally{
   if(enhanced){enhanced.width=0;enhanced.height=0;}
   if(blue){blue.width=0;blue.height=0;}
+  for(const surface of extraSurfaces){surface.width=0;surface.height=0;}
   await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'0'});
  }
 }
