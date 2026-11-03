@@ -5,7 +5,7 @@ import {combinePassportPasses} from '../dist/passport-ocr.js';
 import {parsePassport} from '../dist/parser.js';
 
 const fixture=[
-  'Surname\\nSAMPLE\\nGiven Name(s)\\nTEST PERSON\\nPlace of Issue\\nPUNE\\nDate of Issue Date of Expiry\\n22/11/2018 21/11/2028',
+  'Surname\\nSAMPLE\\nPassport No A1234567\\nGiven Name(s)\\nTEST PERSON\\nPlace of Issue\\nPUNE\\nDate of Issue Date of Expiry\\n22/11/2018 21/11/2028',
   'Nationality / Sex Date of Birth\\nINDIAN M 19/01/2003\\n4567<4IND0301198M2811213<<<<',
   'Country Code\\nP IND\\nPlace of Issue\\nPUNE',
   'Country Code\\nP IND\\nPassport No A1234567'
