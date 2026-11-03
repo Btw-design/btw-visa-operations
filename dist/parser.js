@@ -37,7 +37,7 @@ function labelled(lines,key){
  }
  return '';
 }
-export function passportNeedsRetry(text){const p=parsePassport(text);return ['passport','dob','expiry'].some(k=>!p[k])||(!p.given&&!p.surname);}
+export function passportNeedsRetry(text){const p=parsePassport(text);return ['passport','dob','expiry','given','surname','issued'].some(k=>!p[k]);}
 export function passportWarnings(p){const missing=[['given','given name'],['surname','surname'],['passport','passport number'],['dob','date of birth'],['issued','issue date'],['expiry','expiry date']].filter(([k])=>!p[k]).map(([,label])=>label);return missing.length?`Not read reliably: ${missing.join(', ')}. Check the original and enter missing details.`:'';}
 export function parsePassport(text){
  text=String(text).normalize('NFKC').toUpperCase();const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),out={};

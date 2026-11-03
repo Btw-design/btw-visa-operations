@@ -49,10 +49,10 @@ function lock(value){busy=value;$('visitType').disabled=value;$('invitefile').di
 async function createReader(status){return Tesseract.createWorker('eng',1,{workerPath:new URL('./vendor/worker.min.js',import.meta.url).href,corePath:new URL('./vendor/core/',import.meta.url).href,langPath:new URL('./vendor/lang/',import.meta.url).href,workerBlobURL:false,cacheMethod:'none',logger:m=>{if(m.progress)$('progress').value=m.progress;if(m.status==='recognizing text')$(status).textContent='Reading document… '+Math.round(m.progress*100)+'%';}});}
 async function documentText(file,reader,passport=false){
  if(file.size>20*1024*1024)throw Error('Each file must be 20 MB or smaller.');
- const recognize=async canvas=>{
+ const recognize=async (canvas,source=canvas)=>{
   const worker=await reader();let timer;
   try{return await Promise.race([
-   passport?recognizePassport(canvas,worker,message=>{$('status').textContent=message;}):worker.recognize(canvas).then(r=>r.data.text),
+   passport?recognizePassport(canvas,worker,message=>{$('status').textContent=message;},source):worker.recognize(canvas).then(r=>r.data.text),
    new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Document reading timed out. Try a cropped, upright passport page.')),180000);})
   ]);}finally{clearTimeout(timer);}
  };
@@ -80,8 +80,8 @@ async function documentText(file,reader,passport=false){
  const bitmap=await createImageBitmap(file),canvas=document.createElement('canvas');
  const longest=Math.max(bitmap.width,bitmap.height),scale=passport?Math.min(4,3200/longest):Math.min(1,2200/longest);
  canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
- try{const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();return [await recognize(canvas)];}
- finally{canvas.width=0;canvas.height=0;}
+ try{const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);return [await recognize(canvas,bitmap)];}
+ finally{bitmap.close();canvas.width=0;canvas.height=0;}
 }
 async function readDocuments(kind){if(busy)return;const hotel=kind==='hotel',status=hotel?'hotelstatus':'status',files=hotel?[hotelFile]:selected;if(!files.length||!files[0])return;if(files.length>4){$(status).textContent='Select at most 4 passport files.';return;}const ids=hotel?sections.find(s=>s[0]==='hotel')[3].map(x=>x[0]):passportIds;if(ids.some(k=>$(k).value&&(!hotel||k!=='accommodation'))&&!confirm(hotel?'Replace current hotel details with this booking?':'Replace passport and address details? Other answers will be retained; check they belong to this applicant.'))return;lock(true);$(status).textContent='Reading document…';let worker;const reader=async()=>worker||(worker=await createReader(status));try{let texts=[];for(const f of files)texts.push(...await documentText(f,reader,!hotel));if(!hotel){const numbers=new Set(texts.map(t=>parsePassport(t).passport).filter(Boolean));if(numbers.size>1)throw Error('Different passport numbers were found. Upload the first and address pages for one current passport only.');texts.sort((a,b)=>Number(/P<IND/.test(b))-Number(/P<IND/.test(a)));}let extracted;
  if(hotel){const result=parseHotel(texts.join('\n'));extracted=result.data;paymentPending=result.paymentPending;for(const id of ids)setField(id,extracted[id]||'');if(!['localName','localPhone','localEmail'].some(k=>$(k).value))copyHotelContact();$('hotelok').checked=false;$('bookingnotice').hidden=!paymentPending;$('bookingnotice').textContent='This document states that payment was pending when issued. Confirm the booking’s current status. No booking validity check is performed by this tool.';}
