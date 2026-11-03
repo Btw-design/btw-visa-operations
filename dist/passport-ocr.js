@@ -1,3 +1,4 @@
+import {recoverOcrFields} from './ocr-field-recovery.js';
 import {parsePassport,passportNeedsRetry} from './parser.js?v=c52d580c627f5b7c8b03af0e7605881c44344e129b3e2ed0d473db4074770ce5';
 
 // Background suppression and separable Lanczos resampling for small scans.
@@ -120,8 +121,9 @@ export function combinePassportPasses(attempts,machineLines='',focusedPasses=[])
    recovered.push(label+': '+value);
   }
  }
+ const corroborated=recoverOcrFields([...attempts,...focusedPasses]);
  const mrz=ordered.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||(/^[A-Z0-9<]{28,44}$/.test(x)&&/[FM<]/.test(x[20])));
- return [recovered.join('\n'),recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
+ return [corroborated.lines,recovered.join('\n'),recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
 }
 // One worker per read, bounded sequential retries. Nothing is uploaded or logged.
 export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canvas,onDebug=()=>{}){
