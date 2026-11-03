@@ -11,7 +11,11 @@ export function readPassportMrz(text){
  const result={};if(firsts.length)result.issuecountry=countryNames[firsts[0].issuer];
  const candidates=[];
  for(const row of rows){
-  if(row.length!==44||!/[FM<]/.test(row[20])||row.startsWith('P<'))continue;
+  if(row.length<28||row.length>44||!/[FM<]/.test(row[20])||row.startsWith('P<'))continue;
+  // Cropped images can lose the optional final part of TD3 row two.
+  // Only permit this if its three independently checksummed identity fields
+  // are intact and its issuer matches a recognized first MRZ row.
+  if(row.length<44&&!firsts.some(x=>x.issuer===letters(row.slice(10,13))))continue;
   const nationality=letters(row.slice(10,13));if(!countryNames[nationality])continue;
   const birth=digits(row.slice(13,19)),expiry=digits(row.slice(21,27));
   const birthValid=checked(birth,digits(row[19]))&&!!date(birth,true),expiryValid=checked(expiry,digits(row[27]))&&!!date(expiry,false);
