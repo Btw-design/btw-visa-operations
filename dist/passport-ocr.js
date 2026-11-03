@@ -120,7 +120,7 @@ export function combinePassportPasses(attempts,machineLines='',focusedPasses=[])
    recovered.push(label+': '+value);
   }
  }
- const mrz=ordered.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x));
+ const mrz=ordered.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||(/^[A-Z0-9<]{28,44}$/.test(x)&&/[FM<]/.test(x[20])));
  return [recovered.join('\n'),recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
 }
 // One worker per read, bounded sequential retries. Nothing is uploaded or logged.
@@ -155,7 +155,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
     // Keep this pass separate from visual labels; it is only a candidate MRZ.
     for(const rectangle of bands){
      const result=await worker.recognize(enhanced,{rectangle});
-     const mrz=(result.data.text||'').split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
+     const mrz=(result.data.text||'').split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||(/^[A-Z0-9<]{28,44}$/.test(x)&&/[FM<]/.test(x[20]))).join('\n');
      if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
     }
    }
@@ -170,7 +170,7 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
      extraSurfaces.push(band);
      onRetry('Checking high-contrast passport machine-readable lines…');
      const extracted=await run(band,'6','ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',undefined,false);
-     const mrz=extracted.split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x)).join('\n');
+     const mrz=extracted.split(/\r?\n/).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||(/^[A-Z0-9<]{28,44}$/.test(x)&&/[FM<]/.test(x[20]))).join('\n');
      if(mrz)machineLines=[machineLines,mrz].filter(Boolean).join('\n');
      if(mrz&&parsePassport(mrz).passport)break;
     }
