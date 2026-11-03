@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parsePassport,passportNeedsRetry,passportWarnings} from '../dist/parser.js';
-import {recognizePassport} from '../dist/passport-ocr.js';
+import {recognizePassport,combinePassportPasses} from '../dist/passport-ocr.js';
 const visual=`REPUBLIC OF INDIA
 Passport No.: A1234567
 Surname
@@ -288,4 +288,17 @@ test('browser adaptive MRZ fallback recovers a checked identity and frees tempor
   assert.ok(count>=4);
   assert.ok(allocated.every(c=>c.width===0&&c.height===0));
  }finally{if(previous===undefined)delete globalThis.document;else globalThis.document=previous;}
+});
+
+test('focused browser OCR safely completes a partial Indian passport reading',()=>{
+ const first='REPUBLIC OF INDIA\nGiven Names\nTEST PERSON\nPlace of Birth\nMUMBAI, MAHARASHTRA';
+ const upper='Passport No: A1234567\nSurname\nSAMPLE\nGiven Names\nTEST PERSON\nDate of Birth\n19/01/2003';
+ const lower='Date of Issue\n22/11/2018\nDate of Expiry\n21/11/2028';
+ const p=parsePassport(combinePassportPasses([first],'',[upper,lower]));
+ assert.equal(p.passport,'A1234567');assert.equal(p.surname,'SAMPLE');
+ assert.equal(p.dob,'2003-01-19');assert.equal(p.issued,'2018-11-22');
+ assert.equal(p.expiry,'2028-11-21');
+ // A second contradictory printed identity must not be silently combined.
+ const conflict=parsePassport(combinePassportPasses([first],'',[upper,upper.replace('A1234567','B7654321'),lower]));
+ assert.equal(conflict.passport,undefined);
 });
