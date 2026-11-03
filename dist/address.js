@@ -1,4 +1,4 @@
-import {postalDirectory} from './postal-directory.js';
+import {postalDirectory} from './postal-directory.js?v=97c0c15255bff133463d3695e15f9dfd65d492ffcf765eeb42d640b41284d740';
 const normalize=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const districtNames=[...new Set(Object.values(postalDirectory).flat().map(x=>x[0]))];
 export function identifyDistrict(address,state='',country=''){

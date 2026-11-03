@@ -210,13 +210,34 @@ test('two-letter MRZ prefixes are preserved when correcting only the numeric pos
  assert.equal(parsePassport(raw.replace('AB123458','AB12345B').replace('030119','030118')).passport,undefined);
 });
 
-test('contradictory visual and checksum-verified identities are left for review',()=>{
- for(const fragment of [visual.replace('A1234567','B7654321'),visual.replace('19/01/2003','20/01/2003'),visual.replace('21/11/2028','22/11/2028')]){
+test('different passport numbers block identity mixing while preserving independently agreed fields',()=>{
+ const p=parsePassport(visual.replace('A1234567','B7654321')+'\n'+mrz());
+ for(const key of ['passport','given','surname','issued'])assert.equal(p[key],undefined,key);
+ assert.equal(p.dob,'2003-01-19');assert.equal(p.expiry,'2028-11-21');
+ assert.match(passportWarnings(p),/passport numbers disagree/);
+});
+
+test('one noisy printed date uses the checked MRZ date without clearing the other matching details',()=>{
+ for(const fragment of [visual.replace('19/01/2003','20/01/2003'),visual.replace('21/11/2028','22/11/2028')]){
   const p=parsePassport(fragment+'\n'+mrz());
-  for(const key of ['passport','given','surname','dob','issued','expiry'])assert.equal(p[key],undefined,key);
+  for(const key of ['passport','given','surname','dob','issued','expiry','sex','nationality'])assert.equal(p[key],parsePassport(visual)[key],key);
+  assert.match(passportWarnings(p),/checksum-verified MRZ date/);
  }
+});
+
+test('an impossible issue date does not erase a checked birth date or expiry',()=>{
+ for(const issue of ['21/11/2028','19/01/2003']){
+  const p=parsePassport(visual.replace('22/11/2018',issue)+'\n'+mrz());
+  assert.equal(p.issued,undefined);assert.equal(p.dob,'2003-01-19');assert.equal(p.expiry,'2028-11-21');assert.equal(p.passport,'A1234567');
+  assert.match(passportWarnings(p),/issue date/);
+ }
+});
+
+test('a conflicting name requests review without clearing unrelated fields',()=>{
  const p=parsePassport(visual.replace('TEST PERSON','OTHER PERSON')+'\n'+mrz());
  assert.equal(p.given,undefined);assert.equal(p.surname,'SAMPLE');
+ assert.equal(p.passport,'A1234567');assert.equal(p.issued,'2018-11-22');
+ assert.match(passportWarnings(p),/names disagree/);
 });
 
 test('MRZ verification preserves the visual spelling when only name punctuation differs',()=>{

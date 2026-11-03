@@ -1,6 +1,6 @@
-import {countryNames} from './countries.js';
-import {identifyDistrict} from './address.js';
-import {readPassportMrz} from './passport-mrz.js';
+import {countryNames} from './countries.js?v=376c133b9e9fa19ae30c75d399ba415e41b2ebc74c968c2be6ec36b65eb955cb';
+import {identifyDistrict} from './address.js?v=3a747d4404ba88a2e17ca483092b14ba305ea85ae4924ae3b86d7da82ed13f47';
+import {readPassportMrz} from './passport-mrz.js?v=6201e64c703536310477078621d2c5ff5c553a27584f732493bddbe9ad144ee0';
 
 const labels={
  surname:/\bSURNAME\b/i,
@@ -48,7 +48,7 @@ function labelled(lines,key){
  return '';
 }
 export function passportNeedsRetry(text){const p=parsePassport(text);return ['passport','dob','expiry','given','surname','issued',...(p.issuecountry==='INDIA'?['birthplace','birthstate','issueplace']:[])].some(k=>!p[k]);}
-export function passportWarnings(p){const missing=[['given','given name'],['surname','surname'],['passport','passport number'],['dob','date of birth'],['issued','issue date'],['expiry','expiry date']].filter(([k])=>!p[k]).map(([,label])=>label);return missing.length?`Not read reliably: ${missing.join(', ')}. Check the original and enter missing details.`:'';}
+export function passportWarnings(p){const missing=[['given','given name'],['surname','surname'],['passport','passport number'],['dob','date of birth'],['issued','issue date'],['expiry','expiry date']].filter(([k])=>!p[k]).map(([,label])=>label);return [...(p._ocrWarnings||[]),missing.length?`Not read reliably: ${missing.join(', ')}. Check the original and enter missing details.`:''].filter(Boolean).join(' ');}
 export function parsePassport(text){
  text=String(text).normalize('NFKC').toUpperCase();const lines=text.replace(/[\u0900-\u097f]+/g,' ').split(/\r?\n/).map(x=>x.trim()).filter(Boolean),current=currentPassportLines(lines),out={};
  for(const key of ['surname','given']){const v=cleanName(labelled(current,key));if(v)out[key]=v;}
@@ -63,19 +63,27 @@ export function parsePassport(text){
  const issue=cleanName(labelled(current,'issueplace'));if(issue)out.issueplace=issue;
  const mrz=readPassportMrz(text);
  if(!out.issuecountry&&/REPUBLIC\s+OF\s+INDIA/.test(text))out.issuecountry='INDIA';
- const conflict=['passport','dob','expiry'].some(key=>out[key]&&mrz[key]&&out[key]!==mrz[key]);
- if(conflict){for(const key of ['passport','dob','expiry','given','surname','issued','sex','nationality'])delete out[key];}
- else for(const [key,value]of Object.entries(mrz)){
+ const review=[],differentPassport=out.passport&&mrz.passport&&out.passport!==mrz.passport;
+ if(differentPassport){
+  review.push('Printed and machine-readable passport numbers disagree. Check the document before completing the identity fields.');
+  for(const key of ['passport','given','surname','issued'])delete out[key];
+  for(const key of ['dob','expiry','sex','nationality'])if(!out[key]||out[key]!==mrz[key])delete out[key];
+ }else for(const [key,value]of Object.entries(mrz)){
   if(!out[key])out[key]=value;
+  else if(['dob','expiry'].includes(key)&&out[key]!==value){
+   // A single noisy printed date must not erase a matching passport identity.
+   out[key]=value;review.push(`Check ${key==='dob'?'date of birth':'expiry date'}: the printed OCR differed from the checksum-verified MRZ date.`);
+  }
   else if(['given','surname'].includes(key)){
-   if(out[key].replace(/[^A-Z]/g,'')!==value.replace(/[^A-Z]/g,''))delete out[key];
-  }else if(['sex','nationality'].includes(key)&&out[key]!==value)delete out[key];
+   if(out[key].replace(/[^A-Z]/g,'')!==value.replace(/[^A-Z]/g,'')){delete out[key];review.push(`Check ${key==='given'?'given name':'surname'}: printed and machine-readable names disagree.`);}
+  }else if(['sex','nationality'].includes(key)&&out[key]!==value){delete out[key];review.push(`Check ${key}: printed and machine-readable values disagree.`);}
  }
  if(out.passport)out.documentType='International Passport';
  // Never silently swap dates or populate a contradictory chronology.
- if(out.issued&&out.expiry&&out.issued>=out.expiry){delete out.issued;delete out.expiry;}
- if(out.dob&&out.issued&&out.dob>=out.issued){delete out.dob;delete out.issued;}
+ if(out.issued&&out.expiry&&out.issued>=out.expiry){delete out.issued;if(out.expiry!==mrz.expiry)delete out.expiry;}
+ if(out.dob&&out.issued&&out.dob>=out.issued){delete out.issued;if(out.dob!==mrz.dob)delete out.dob;}
  if(out.dob&&out.dob>new Date().toISOString().slice(0,10))delete out.dob;
+ if(review.length)out._ocrWarnings=review;
  const a=lines.findIndex(x=>labels.address.test(x)&&!oldPassport.test(x));
  if(a>=0){let stop=lines.findIndex((x,i)=>i>a&&(oldPassport.test(x)||/^P</.test(x)||/--- DOCUMENT PAGE ---/.test(x)));if(stop<0)stop=lines.length;
   const inline=lines[a].slice(lines[a].search(labels.address)+7).replace(/^[\s:/.|\-]+/,'');

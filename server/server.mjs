@@ -29,7 +29,7 @@ export function createApp() {
       if (!actual || !actual.startsWith(root + sep) || !(await stat(actual)).isFile()) return reply(404, 'Not found.');
       const bytes = await readFile(actual);
       res.writeHead(200, { 'Content-Type':types[extname(actual)] || 'application/octet-stream', 'Content-Length':bytes.length,
-        'Cache-Control':extname(actual) === '.html' ? 'no-cache' : 'public, max-age=3600' });
+        'Cache-Control':['.html','.js','.mjs','.json'].includes(extname(actual)) ? 'no-cache, max-age=0, must-revalidate' : 'public, max-age=3600' });
       res.end(req.method === 'HEAD' ? undefined : bytes);
     } catch { if (!res.headersSent) reply(400, 'Bad request.'); else res.end(); }
   });

@@ -5,11 +5,13 @@
   "main": "index.js",
   "scripts": {
     "check": "node --check dist/app.js && node --check dist/parser.js && node --check dist/hotel-parser.js && node --check dist/schema.js && node --check dist/pdf.js && node --check dist/invitation-parser.js && node --check dist/hotel-defaults.js && node --check dist/passport-ocr.js && node --check dist/passport-mrz.js",
-    "test": "node --test tests/workflow.test.mjs",
+    "test": "node --test tests/workflow.test.mjs tests/passport.test.mjs tests/release.test.mjs",
     "start": "node server/server.mjs",
     "setup:admin": "node server/setup-admin.mjs",
     "test:auth": "node --test tests/auth.test.mjs",
-    "test:passport": "node --test tests/passport.test.mjs"
+    "test:passport": "node --test tests/passport.test.mjs",
+    "build:release": "node scripts/version-assets.mjs",
+    "test:release": "node --test tests/release.test.mjs"
   },
   "keywords": [],
   "author": "",

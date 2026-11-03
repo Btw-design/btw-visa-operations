@@ -1,0 +1,7 @@
+# Revalidate the application modules together after an OCR update.
+# Keep the large, unchanged OCR language/WASM assets under normal hosting policy.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html?|m?js|json)$">
+    Header set Cache-Control "no-cache, max-age=0, must-revalidate"
+  </FilesMatch>
+</IfModule>

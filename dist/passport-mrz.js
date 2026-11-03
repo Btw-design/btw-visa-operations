@@ -1,4 +1,4 @@
-import {countryNames} from './countries.js';
+import {countryNames} from './countries.js?v=376c133b9e9fa19ae30c75d399ba415e41b2ebc74c968c2be6ec36b65eb955cb';
 // Corrections are position-specific, not global replacements in names or passport IDs.
 const digits=s=>s.replace(/[OQ]/g,'0').replace(/[IL]/g,'1').replace(/Z/g,'2').replace(/S/g,'5').replace(/B/g,'8').replace(/T/g,'7');
 const letters=s=>s.replace(/0/g,'O').replace(/1/g,'I').replace(/2/g,'Z').replace(/5/g,'S').replace(/8/g,'B');
