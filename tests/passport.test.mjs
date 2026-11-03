@@ -302,3 +302,17 @@ test('focused browser OCR safely completes a partial Indian passport reading',()
  const conflict=parsePassport(combinePassportPasses([first],'',[upper,upper.replace('A1234567','B7654321'),lower]));
  assert.equal(conflict.passport,undefined);
 });
+
+test('cropped TD3 line retains only checksum-confirmed identity',()=>{
+ const first='P<INDNAIK<<YASH<ANANT<<<<<<<<<<<<<<<';
+ const second='T8014383<4IND0105101M2909196';
+ const result=parsePassport(first+'\n'+second);
+ assert.equal(result.passport,'T8014383');
+ assert.equal(result.surname,'NAIK');
+ assert.equal(result.given,'YASH ANANT');
+ assert.equal(result.dob,'2001-05-10');
+ assert.equal(result.expiry,'2029-09-19');
+ assert.equal(result.sex,'Male');
+ assert.equal(parsePassport(first+'\n'+second.replace('2909196','2909195')).passport,undefined);
+ assert.equal(parsePassport(second).passport,undefined);
+});
