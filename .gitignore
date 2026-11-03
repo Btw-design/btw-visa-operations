@@ -15,6 +15,10 @@ uploads/
 
 # Private authentication records and backups
 /data/
+paddle.env
+ocr-service/__pycache__/
+ocr-service/.venv/
+ocr-service/models/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

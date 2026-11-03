@@ -20,7 +20,7 @@ The original Start-Visa-Software.cmd remains the static, computer-local edition 
 - Passwords use salted scrypt hashes. Session tokens are random, stored as hashes, and delivered in HttpOnly, SameSite cookies (Secure on HTTPS).
 - Sessions expire after eight hours, or after one hour without a request. Password change/reset and disable revoke existing sessions. Logout revokes the current session.
 - The server rejects cross-origin changes and throttles repeated sign-in attempts. All application assets, PDFs and OCR files require a session. An account with a temporary password cannot access them until the password is changed.
-- Authentication records are persisted in data/auth.sqlite. Applicant documents and form answers continue to be processed only inside the browser; the server has no document-upload API.
+- Authentication records are persisted in data/auth.sqlite. The default reader processes documents in the browser. If the optional PaddleOCR backend is configured, passport files are processed through the authenticated website gateway without being saved as applicant records; hotel and invitation reading remains in the browser. See [PADDLE-OCR.md](PADDLE-OCR.md). The supplied PaddleOCR deployment currently leaves sign-in aside and uses the existing open-access server.
 
 ## External deployment requirements
 

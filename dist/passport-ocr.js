@@ -54,6 +54,13 @@ function recoveredVisualFields(attempts){
   return [`${label}: ${value}`];
  }).join('\n');
 }
+// Shared by the browser reader and the website's PaddleOCR gateway.
+export function combinePassportPasses(attempts,machineLines=''){
+ const ordered=attempts.filter(Boolean).slice().sort((a,b)=>score(b)-score(a));
+ if(!ordered.length)return machineLines;
+ const mrz=ordered.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x));
+ return [recoveredVisualFields(ordered),ordered[0],...mrz,machineLines].filter(Boolean).join('\n');
+}
 // One worker per read, bounded sequential retries. Nothing is uploaded or logged.
 export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canvas){
  const run=async(surface,mode,whitelist='',rectangle,rotateAuto=true)=>{
@@ -100,11 +107,9 @@ export async function recognizePassport(canvas,worker,onRetry=()=>{},source=canv
     attempts.push(await run(enhanced,'6','',{left,top,width:canvas.width-left,height:bottom-top}));
    }
   }
-  attempts.sort((a,b)=>score(b)-score(a));
   // Preserve MRZ candidates for conflict checks; fill missing visual fields only
   // from passes corroborated by all three identity fields.
-  const mrz=attempts.slice(1).flatMap(x=>x.split(/\r?\n/)).map(x=>x.replace(/\s/g,'')).filter(x=>/^P<[A-Z0-9]{3}/.test(x)||/^[A-Z0-9<]{44}$/.test(x));
-  return [recoveredVisualFields(attempts),attempts[0],...mrz,machineLines].filter(Boolean).join('\n');
+  return combinePassportPasses(attempts,machineLines);
  }finally{
   if(enhanced){enhanced.width=0;enhanced.height=0;}
   if(blue){blue.width=0;blue.height=0;}

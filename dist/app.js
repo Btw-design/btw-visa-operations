@@ -1,7 +1,8 @@
 import * as pdfjs from './vendor/pdf.min.mjs?v=27fc2a057a00f92a4334ad06e17dbd7259912954e9fb7f76400bcca5fd190a9c';
 import {identifyDistrict} from './address.js?v=3a747d4404ba88a2e17ca483092b14ba305ea85ae4924ae3b86d7da82ed13f47';
 import {parsePassport,passportNeedsRetry,passportWarnings} from './parser.js?v=3684b54660747a0f85433c14dfc8a3ac6c76161316cd6867f1ff49fd377ff7b3';
-import {recognizePassport} from './passport-ocr.js?v=ffce1d8caf3a6f034cc5243b7272e0e7e805d15b292bf77cc36bb7ccd392c345';
+import {recognizePassport} from './passport-ocr.js?v=280a481901b6d5265dd7786572f5bdc1344c241129e52141c4993bddb365c768';
+import {websiteOcrConfig,readWebsitePassport} from './website-ocr.js?v=653ab090c8369d8a097b14a708329cdf33ea0fdd3d9584a55c4c031e74478500';
 import {parseInvitation,invitationFormText} from './invitation-parser.js?v=66a95a94cd8d182c8330bb8b0ac12179c8240ae58b84e11062c85042ee0976fd';
 import {defaultHotelPatch} from './hotel-defaults.js?v=ac397997aee5485c1ca33a1bf03c772314ddccc97b8da33c305e1d6090897d44';
 import {parseHotel} from './hotel-parser.js?v=a828cc872558a0e5b00a0cbfc1c3bdb9bd56d6abab8cc21b99c2ef1e4ab2da7b';
@@ -10,6 +11,14 @@ import {fillDraft} from './pdf.js?v=bd9a417a84bfca2892ed256edaa3a56f8fb73286dc92
 pdfjs.GlobalWorkerOptions.workerSrc=new URL('./vendor/pdf.worker.min.mjs',import.meta.url).href;
 const $=id=>document.getElementById(id);let generating=false,busy=false,selected=[],hotelFile=null,paymentPending=false,inviteFile=null,invitationResult=null,invitationRead=false,previousVisit='Tourism';
 if($('readerVersion'))$('readerVersion').textContent='Passport reader '+(new URL(import.meta.url).searchParams.get('v')?.slice(0,12)||'development');
+const websiteReader=websiteOcrConfig().then(config=>{
+ const version=new URL(import.meta.url).searchParams.get('v')?.slice(0,12)||'development';
+ if($('readerVersion'))$('readerVersion').textContent=(config.mode==='paddle'?'PaddleOCR':'Browser reader')+' · '+version;
+ if($('processingTitle'))$('processingTitle').textContent=config.mode==='paddle'?'Passport reading on this website':'Documents stay in this browser';
+ if($('processingPrivacy'))$('processingPrivacy').textContent=config.mode==='paddle'?'Passport files are sent to this website’s OCR server and processed in memory. Hotel and invitation documents are read in your browser. Applicant files and form details are not saved by this app.':'Documents are read on your device. Applicant details are not saved on the website. Download your form before closing or refreshing this page.';
+ return config;
+});
+websiteReader.catch(()=>{$('status').textContent='The website reader is unavailable. Sign in again or contact the administrator.';});
 const passportIds=sections[0][3].map(x=>x[0]).filter(x=>!['alias','marital','spouseType','spouseNric','spouseNationality','race'].includes(x)).concat(['address','rescountry','resstate','district']);
 let districtWasAutomatic=false;const defaultHotelFields=new Map();
 function applyDefaultHotel(){const patch=defaultHotelPatch(data(),{visitType:$('visitType').value,hasHotelFile:!!hotelFile});for(const[id,value]of Object.entries(patch)){setField(id,value);defaultHotelFields.set(id,value);}if(Object.keys(patch).length)$('hotelok').checked=false;}
@@ -84,11 +93,46 @@ async function documentText(file,reader,passport=false){
  try{const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);return [await recognize(canvas,bitmap)];}
  finally{bitmap.close();canvas.width=0;canvas.height=0;}
 }
-async function readDocuments(kind){if(busy)return;const hotel=kind==='hotel',status=hotel?'hotelstatus':'status',files=hotel?[hotelFile]:selected;if(!files.length||!files[0])return;if(files.length>4){$(status).textContent='Select at most 4 passport files.';return;}const ids=hotel?sections.find(s=>s[0]==='hotel')[3].map(x=>x[0]):passportIds;if(ids.some(k=>$(k).value&&(!hotel||k!=='accommodation'))&&!confirm(hotel?'Replace current hotel details with this booking?':'Replace passport and address details? Other answers will be retained; check they belong to this applicant.'))return;lock(true);$(status).textContent='Reading document…';let worker;const reader=async()=>worker||(worker=await createReader(status));try{let texts=[];for(const f of files)texts.push(...await documentText(f,reader,!hotel));if(!hotel){const numbers=new Set(texts.map(t=>parsePassport(t).passport).filter(Boolean));if(numbers.size>1)throw Error('Different passport numbers were found. Upload the first and address pages for one current passport only.');texts.sort((a,b)=>Number(/P<IND/.test(b))-Number(/P<IND/.test(a)));}let extracted;
- if(hotel){const result=parseHotel(texts.join('\n'));extracted=result.data;paymentPending=result.paymentPending;for(const id of ids)setField(id,extracted[id]||'');if(!['localName','localPhone','localEmail'].some(k=>$(k).value))copyHotelContact();$('hotelok').checked=false;$('bookingnotice').hidden=!paymentPending;$('bookingnotice').textContent='This document states that payment was pending when issued. Confirm the booking’s current status. No booking validity check is performed by this tool.';}
- else{extracted=parsePassport(texts.join('\n--- DOCUMENT PAGE ---\n'));for(const id of passportIds)setField(id,extracted[id]||'');districtWasAutomatic=!!extracted.district;$('inviteok').checked=false;$('addressok').checked=false;$('hotelok').checked=false;}
- const count=ids.filter(id=>extracted[id]).length;$(status).textContent=count?`Read ${count} details. ${hotel?'Review every value; blank fields need your input.':passportWarnings(extracted)||'Review every value against the original passport.'}`:'Could not identify the details clearly after reading. Use an upright, close crop of the passport first page, with all text and both machine-readable lines visible, or enter the details manually.';changed();}
- catch(e){$(status).textContent='Could not read document: '+e.message+' You can enter details manually.';}finally{await worker?.terminate();lock(false);update();}}
+async function readDocuments(kind){
+ if(busy)return;
+ const hotel=kind==='hotel',status=hotel?'hotelstatus':'status',files=hotel?[hotelFile]:selected;
+ if(!files.length||!files[0])return;
+ if(files.length>4){$(status).textContent='Select at most 4 passport files.';return;}
+ const ids=hotel?sections.find(s=>s[0]==='hotel')[3].map(x=>x[0]):passportIds;
+ if(ids.some(k=>$(k).value&&(!hotel||k!=='accommodation'))&&!confirm(hotel?'Replace current hotel details with this booking?':'Replace passport and address details? Other answers will be retained; check they belong to this applicant.'))return;
+ lock(true);$(status).textContent='Reading document…';let worker;
+ const reader=async()=>worker||(worker=await createReader(status));
+ try{
+  let extracted,serverResult,texts=[];
+  const config=hotel?{mode:'browser'}:await websiteReader;
+  if(config.mode==='paddle'){
+   $(status).textContent='Reading passport on the website OCR server…';
+   serverResult=await readWebsitePassport(files);extracted=serverResult.fields;
+  }else{
+   for(const f of files)texts.push(...await documentText(f,reader,!hotel));
+   if(!hotel){
+    const numbers=new Set(texts.map(t=>parsePassport(t).passport).filter(Boolean));
+    if(numbers.size>1)throw Error('Different passport numbers were found. Upload the first and address pages for one current passport only.');
+    texts.sort((a,b)=>Number(/P<IND/.test(b))-Number(/P<IND/.test(a)));
+    extracted=parsePassport(texts.join('\n--- DOCUMENT PAGE ---\n'));
+   }
+  }
+  if(hotel){
+   const result=parseHotel(texts.join('\n'));extracted=result.data;paymentPending=result.paymentPending;
+   for(const id of ids)setField(id,extracted[id]||'');
+   if(!['localName','localPhone','localEmail'].some(k=>$(k).value))copyHotelContact();
+   $('hotelok').checked=false;$('bookingnotice').hidden=!paymentPending;
+   $('bookingnotice').textContent='This document states that payment was pending when issued. Confirm the booking’s current status. No booking validity check is performed by this tool.';
+  }else{
+   for(const id of passportIds)setField(id,extracted[id]||'');districtWasAutomatic=!!extracted.district;
+   $('inviteok').checked=false;$('addressok').checked=false;$('hotelok').checked=false;
+  }
+  const count=ids.filter(id=>extracted[id]).length;
+  $(status).textContent=count?`Read ${count} details. ${hotel?'Review every value; blank fields need your input.':serverResult?.warning||passportWarnings(extracted)||'Review every value against the original passport.'}`:'Could not identify the details clearly after reading. Use an upright, close crop of the passport first page, with all text and both machine-readable lines visible, or enter the details manually.';
+  changed();
+ }catch(e){$(status).textContent='Could not read document: '+e.message+' You can enter details manually.';}
+ finally{await worker?.terminate();lock(false);update();}
+}
 $('read').onclick=()=>readDocuments('passport');$('readhotel').onclick=()=>readDocuments('hotel');
 function errorsFor(d,complete){const errors=[];if(!d.given&&!d.surname)errors.push({id:'given',label:'Enter the applicant name.'});if(!d.passport)errors.push({id:'passport',label:'Enter the travel document number.'});if(d.dob&&d.applicationDate&&d.dob>d.applicationDate)errors.push({id:'dob',label:'Date of birth cannot be after the application date.'});if(d.dob&&d.issued&&d.dob>d.issued)errors.push({id:'dob',label:'Date of birth cannot be after the passport issue date.'});if(d.issued&&d.expiry&&d.issued>=d.expiry)errors.push({id:'expiry',label:'Passport expiry must be after its issue date.'});if(d.income&&Number(d.income)<0)errors.push({id:'income',label:'Annual income cannot be negative.'});for(const [id,label,type,cond]of allFields){if(!applicable(cond,d))continue;const el=$(id);if(el.value&&!el.validity.valid)errors.push({id,label:'Check '+label.toLowerCase()+'.'});if(!Array.isArray(type)&&/[^\x20-\x7e\r\n]/.test(d[id]))errors.push({id,label:label+': use the English / Latin spelling for this form.'});}if(d.resided==='Yes')rows().forEach((r,i)=>{if(r.from&&r.to&&r.from>r.to)errors.push({id:`rh-${i}-to`,label:`Residence ${i+1}: To date must be after From date.`});});if(complete){if(familyVisit()){if(!invitationRead)errors.push({id:'invitefile',label:'Upload and read a V39A or invitation letter for this visit.'});if(!$('inviteok').checked)errors.push({id:'inviteok',label:'Confirm the V39A / invitation covers this applicant.'});}errors.push(...missingFields(d,d.resided==='Yes'?rows():[]));if(!$('addressok').checked)errors.push({id:'addressok',label:'Confirm the current residential address.'});if(!$('hotelok').checked)errors.push({id:'hotelok',label:familyVisit()?'Confirm the Singapore stay address and contact details.':'Confirm hotel details and that the booking covers this applicant.'});}if(!$('reviewed').checked)errors.push({id:'reviewed',label:'Check the entered details and tick the final review confirmation.'});return [...new Map(errors.map(x=>[x.id,x])).values()];}
 function showErrors(errors){const box=$('errors');box.replaceChildren();const h=document.createElement('strong');h.textContent='Please complete or check these items:';const ul=document.createElement('ul');for(const {id,label}of errors){const li=document.createElement('li'),a=document.createElement('a');a.href='#'+id;a.textContent=label;a.onclick=e=>{e.preventDefault();const el=$(id);el?.closest('details')?.setAttribute('open','');el?.focus();el?.scrollIntoView({block:'center',behavior:'smooth'});};li.append(a);ul.append(li);$(id)?.closest('.field')?.classList.add('invalid');}box.append(h,ul);box.hidden=false;box.scrollIntoView({block:'center',behavior:'smooth'});}

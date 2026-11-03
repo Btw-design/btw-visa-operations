@@ -1,5 +1,7 @@
 # Apply the OCR update to the current Hostinger site
 
+For the newer server-side PaddleOCR option, use [PADDLE-OCR.md](PADDLE-OCR.md). The static-file instructions below update the browser reader; they do not activate a Python OCR backend.
+
 The live site serves frontend files directly at the website root. The current release must be deployed as the contents of `dist/`, including its `index.html`, JavaScript modules, and `ocr-release.json`. Keep the existing vendor and brand folders. Merge the supplied `.htaccess` cache-header block with any existing rules. Updating just the earlier four OCR files is insufficient because this release versions the complete module graph.
 
 Download the current repository ZIP from GitHub and extract it. In Hostinger File Manager, open the folder containing the live `app.js` (normally `public_html`) and copy the contents of the extracted `dist/` folder there. Avoid adding an extra enclosing directory. Use `dist/index.html`, not the repository-root launcher `index.html`. Clear Hostinger/CDN cache and hard-refresh the browser with Ctrl+F5. Confirm both PCs show the same passport reader version before reading the same files again. Existing PDF/OCR language assets do not need replacement if their contents are unchanged.

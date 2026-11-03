@@ -1,0 +1,9 @@
+# CPU-only server inference. Keep these versions identical on every deployment.
+paddlepaddle==3.2.2
+paddleocr==3.3.2
+paddlex[ocr-core]==3.3.10
+fastapi==0.115.12
+uvicorn==0.34.2
+Pillow==11.3.0
+numpy==2.2.6
+pypdfium2==4.30.0

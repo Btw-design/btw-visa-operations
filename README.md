@@ -12,7 +12,7 @@ A private tool to prepare Singapore Form 14A for tourism, family/friend visits a
 
 ## What is stored
 
-This version does not save applicant records, documents, or answers to a server or browser storage. Closing or refreshing the page clears the entered information. Document reading uses browser-based OCR or a PDF's embedded text. All document-processing libraries are served with the application; no third-party OCR endpoint is used.
+This version does not save applicant records, documents, or answers to server or browser storage. Closing or refreshing the page clears the entered information. The default reader uses browser OCR or embedded PDF text. An optional PaddleOCR backend reads passport files on the website server; hotel and invitation reading stays in the browser. The page shows the selected mode and its processing notice. No paid third-party OCR API is used. See [hosted PaddleOCR setup](PADDLE-OCR.md) for backend hosting requirements and current validation limits.
 
 Private access is managed by Sites. Keep the site private. Staff sharing is configured separately; application code does not replace the platform access controls.
 
@@ -44,7 +44,7 @@ Run `npm run check` and `npm test` for verification. The tracked hosting manifes
 
 Issue country is identified from the passport issuing-state code (IND becomes INDIA); the issue city is not used for this field. Typed and extracted text is capitalised in the website and PDF. Reference-only hotel address, stay dates and lead guest fields are omitted. Downloaded PDFs have no added watermark, including drafts.
 
-District suggestions use explicit address district labels or a bundled India Post PIN directory; ambiguous or unknown addresses remain for manual completion. All lookup happens locally in the browser. Review suggestions because administrative boundaries can change.
+District suggestions use explicit address district labels or a bundled India Post PIN directory; ambiguous or unknown addresses remain for manual completion. The browser reader and optional website backend use bundled data without an external address-lookup API. Review suggestions because administrative boundaries can change.
 
 Country names: i18n-iso-countries / ISO 3166-1. Postal data: India Post, All India Pincode Directory, https://www.data.gov.in/catalog/all-india-pincode-directory-through-webservice . Bundled PIN/district/state index generated from the unchanged CSV mirror at https://github.com/dropdevrahul/pincodes-india/blob/master/pincode.csv (mirror snapshot 2024-05-05), under Government Open Data License – India. No user data is sent to this source.
 

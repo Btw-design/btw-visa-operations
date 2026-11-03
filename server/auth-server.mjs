@@ -3,6 +3,7 @@ import { readFile, realpath, stat } from 'node:fs/promises';
 import { resolve, dirname, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
+import { createOcrGateway } from './ocr-gateway.mjs';
 import { openDatabase, emailOf, validEmail, validPassword, passwordHash, passwordMatches,
   tokenHash, sessionUser, issueSession, publicUser } from './auth.mjs';
 
@@ -23,7 +24,7 @@ async function body(req) {
   try { const value = JSON.parse(data); if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error(); return value; }
   catch { throw fail(400, 'Invalid request.'); }
 }
-export async function createApp({ databasePath, origin, production = false } = {}) {
+export async function createApp({ databasePath, origin, production = false, ocr = {} } = {}) {
   origin ||= process.env.APP_ORIGIN || 'http://127.0.0.1:3000';
   const url = new URL(origin);
   if (url.origin !== origin || (production && url.protocol !== 'https:') || !['http:','https:'].includes(url.protocol)) {
@@ -34,6 +35,7 @@ export async function createApp({ databasePath, origin, production = false } = {
   const cookieName = secure ? '__Host-btw_session' : 'btw_session';
   const cookie = (token, age = 28800) => `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secure ? '; Secure' : ''}`;
   const dummyHash = await passwordHash(randomBytes(32).toString('hex'));
+  const handleOcr=createOcrGateway(ocr);
   const server = http.createServer(async (req, res) => {
     const json = (code, value) => { res.writeHead(code, { 'Content-Type':'application/json; charset=utf-8' }); res.end(JSON.stringify(value)); };
     const redirect = path => { res.writeHead(303, { Location:path }); res.end(); };
@@ -105,6 +107,7 @@ export async function createApp({ databasePath, origin, production = false } = {
         if (path.startsWith('/api/')) throw fail(403,'Change your temporary password first.');
         return redirect('/account');
       }
+      if(await handleOcr(req,res,path))return;
       if (path.startsWith('/api/admin/')) {
         if (user.role !== 'admin') throw fail(403,'Admin access required.');
         if (path === '/api/admin/users' && req.method === 'GET') return json(200,db.prepare('SELECT * FROM users ORDER BY id').all().map(publicUser));
@@ -166,7 +169,7 @@ export async function createApp({ databasePath, origin, production = false } = {
       else res.end();
     }
   });
-  server.requestTimeout = 15000; server.headersTimeout = 10000;
+  server.requestTimeout = 120000; server.headersTimeout = 10000;
   server.on('close',()=>db.close());
   return {server,db};
 }
